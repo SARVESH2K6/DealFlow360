@@ -3,23 +3,19 @@ import express from 'express'
 import { createServer } from 'http'
 import jwt from 'jsonwebtoken'
 import { Server } from 'socket.io'
-import {
-  appendAudit,
-  approvalDetail,
-  canMutateQuotation,
-  computeQuotationRisk,
-  db,
-  getUpsells,
-  listItem,
-  logActivity,
-  nextId,
-  publicUser,
-  quotationVisibleTo,
-  requiredApprovalLevel,
-  canConsolidateBackorder,
-  consolidateBackorder,
-  remainingBackorderQty,
-} from './store.js'
+
+import * as usersDb from './db/users.js'
+import * as custDb from './db/customers.js'
+import * as prodDb from './db/products.js'
+import * as quotDb from './db/quotations.js'
+import * as appDb from './db/approvals.js'
+import * as fulfillDb from './db/fulfillment.js'
+import * as subDb from './db/subscriptions.js'
+import * as invDb from './db/invoices.js'
+import * as healthDb from './db/dealHealth.js'
+import * as portalDb from './db/portal.js'
+import * as actDb from './db/activity.js'
+import * as confDb from './db/discountConfig.js'
 
 const app = express()
 const httpServer = createServer(app)
@@ -33,16 +29,24 @@ const JWT_SECRET = process.env.JWT_SECRET || 'df360-dev-secret'
 app.use(cors({ origin: true, credentials: true }))
 app.use(express.json())
 
-function emitOrder(quotationId) {
-  const quotation = db.quotations.find((q) => q.id === quotationId)
-  if (quotation) computeQuotationRisk(quotation)
-  const approval = db.approvals.find((a) => a.quotationId === quotationId)
-  io.to(`order:${quotationId}`).emit('order:updated', {
-    quotationId,
-    quotation: quotation ? { ...quotation, upsells: getUpsells(quotation) } : null,
-    approval: approval ? approvalDetail(approval) : null,
-  })
-  io.to('workspace').emit('workspace:updated', { type: 'quotation', id: quotationId })
+// Wrap async handlers
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
+
+async function emitOrder(quotationId) {
+  try {
+    const quotation = await quotDb.getQuotation(quotationId)
+    const approvalsList = await appDb.listApprovals()
+    const approval = approvalsList.find((a) => a.quotationId === quotationId)
+    
+    io.to(`order:${quotationId}`).emit('order:updated', {
+      quotationId,
+      quotation: quotation || null,
+      approval: approval ? await appDb.getApproval(approval.id) : null,
+    })
+    io.to('workspace').emit('workspace:updated', { type: 'quotation', id: quotationId })
+  } catch (err) {
+    console.error('Error emitting order update:', err)
+  }
 }
 
 io.on('connection', (socket) => {
@@ -54,15 +58,15 @@ io.on('connection', (socket) => {
   })
 })
 
-function auth(req, res, next) {
+async function auth(req, res, next) {
   const header = req.headers.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return res.status(401).json({ error: 'Unauthorized' })
   try {
-    req.user = jwt.verify(token, JWT_SECRET)
-    const live = db.users.find((u) => u.id === req.user.id)
+    const decoded = jwt.verify(token, JWT_SECRET)
+    const live = await usersDb.findById(decoded.id)
     if (!live) return res.status(401).json({ error: 'Unauthorized' })
-    req.user = { ...req.user, ...publicUser(live) }
+    req.user = usersDb.publicUser(live)
     next()
   } catch {
     res.status(401).json({ error: 'Unauthorized' })
@@ -79,974 +83,390 @@ function requireRoles(roles) {
 }
 
 function signUser(user) {
-  const payload = publicUser(user)
+  const payload = usersDb.publicUser(user)
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
   return { token, user: payload }
 }
 
+// ── Health ───────────────────────────────────────────────────────────
+
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'dealflow360', time: new Date().toISOString() })
+  res.json({ ok: true, service: 'dealflow360-pg', time: new Date().toISOString() })
 })
 
-app.post('/api/auth/login', (req, res) => {
+// ── Auth ─────────────────────────────────────────────────────────────
+
+app.post('/api/auth/login', wrap(async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase()
   const password = String(req.body?.password || '')
-  const user = db.users.find((u) => u.email === email && u.password === password)
+  const user = await usersDb.findByCredentials(email, password)
   if (!user) return res.status(401).json({ error: 'Invalid email or password' })
   res.json(signUser(user))
-})
+}))
 
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', wrap(async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase()
   const password = String(req.body?.password || '')
   const name = String(req.body?.name || '').trim() || email.split('@')[0]
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
-  if (db.users.some((u) => u.email === email)) {
-    return res.status(409).json({ error: 'An account with that email already exists' })
-  }
-  const customerId = nextId('c', db.customers)
-  const customer = {
-    id: customerId,
-    name: `${name} (portal)`,
-    tier: 'Bronze',
-    region: 'North America',
-    terms: 'Net 30',
-  }
-  db.customers.push(customer)
-  const user = {
-    id: nextId('u', db.users),
-    email,
-    password,
-    name,
-    role: 'customer',
-    customerId,
-  }
-  db.users.push(user)
+  const existing = await usersDb.findByEmail(email)
+  if (existing) return res.status(409).json({ error: 'An account with that email already exists' })
+  
+  const user = await usersDb.createCustomerUser(email, password, name)
   res.status(201).json(signUser(user))
-})
+}))
 
 app.get('/api/me', auth, (req, res) => {
   res.json(req.user)
 })
 
-app.get('/api/customers', auth, (_req, res) => {
-  res.json({ items: db.customers })
-})
+// ── Customers & Products ─────────────────────────────────────────────
 
-app.get('/api/pricelists', auth, (_req, res) => {
-  res.json({ items: db.pricelists })
-})
+app.get('/api/customers', auth, wrap(async (_req, res) => {
+  res.json({ items: await custDb.listCustomers() })
+}))
 
-app.get('/api/dashboard/summary', auth, (req, res) => {
-  const visible = db.quotations.filter((q) => quotationVisibleTo(q, req.user))
-  const pendingApprovals = db.approvals.filter((a) => a.status === 'pending').length
-  const openQuotations = visible.filter((q) =>
-    ['draft', 'returned', 'pending_approval', 'negotiation'].includes(q.status),
-  ).length
-  const atRiskDeals = db.dealHealth.length
-  let valueWeight = 0
-  let discountWeight = 0
-  for (const q of visible) {
-    computeQuotationRisk(q)
-    for (const line of q.lines) {
-      const v = line.qty * line.price
-      valueWeight += v
-      discountWeight += v * line.discountPercent
+app.get('/api/products', auth, wrap(async (_req, res) => {
+  res.json(await prodDb.listProducts())
+}))
+
+app.post('/api/products', auth, requireRoles(['admin']), wrap(async (req, res) => {
+  res.status(201).json(await prodDb.createProduct(req.body))
+}))
+
+app.get('/api/products/:id', auth, wrap(async (req, res) => {
+  const data = await prodDb.getProduct(req.params.id)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
+
+app.patch('/api/products/:id', auth, requireRoles(['admin']), wrap(async (req, res) => {
+  const data = await prodDb.patchProduct(req.params.id, req.body)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
+
+app.get('/api/pricelists', auth, wrap(async (_req, res) => {
+  res.json({ items: await prodDb.listPricelists() })
+}))
+
+// ── Dashboard & Reports ──────────────────────────────────────────────
+
+app.get('/api/dashboard/summary', auth, wrap(async (_req, res) => {
+  res.json(await actDb.getDashboardSummary())
+}))
+
+app.get('/api/reports', auth, requireRoles(['admin']), wrap(async (req, res) => {
+  res.json({ ...await actDb.getReports(), filters: req.query })
+}))
+
+// ── Quotations ───────────────────────────────────────────────────────
+
+app.get('/api/quotations', auth, wrap(async (req, res) => {
+  res.json({ items: await quotDb.listQuotations(req.user) })
+}))
+
+app.post('/api/quotations', auth, requireRoles(['rep', 'manager', 'admin']), wrap(async (req, res) => {
+  const q = await quotDb.createQuotation(req.body, req.user)
+  if (!q) return res.status(400).json({ error: 'Unknown customer' })
+  res.status(201).json(q)
+}))
+
+app.get('/api/quotations/:id', auth, wrap(async (req, res) => {
+  const q = await quotDb.getQuotation(req.params.id)
+  if (!q) return res.status(404).json({ error: 'Not found' })
+  if (req.user.role === 'customer' && q.customerId !== req.user.customerId) return res.status(403).json({ error: 'Forbidden' })
+  res.json(q)
+}))
+
+app.patch('/api/quotations/:id', auth, wrap(async (req, res) => {
+  const q = await quotDb.patchQuotation(req.params.id, req.body)
+  if (!q) return res.status(404).json({ error: 'Not found' })
+  res.json(q)
+}))
+
+app.post('/api/quotations/:id/lines', auth, wrap(async (req, res) => {
+  const q = await quotDb.addLine(req.params.id, req.body)
+  if (!q) return res.status(404).json({ error: 'Not found' })
+  res.json(q)
+}))
+
+app.patch('/api/quotations/:id/lines/:lineId', auth, wrap(async (req, res) => {
+  const q = await quotDb.patchLine(req.params.id, req.params.lineId, req.body)
+  if (!q) return res.status(404).json({ error: 'Not found' })
+  await emitOrder(req.params.id)
+  res.json(q)
+}))
+
+app.delete('/api/quotations/:id/lines/:lineId', auth, wrap(async (req, res) => {
+  const q = await quotDb.deleteLine(req.params.id, req.params.lineId)
+  if (!q) return res.status(404).json({ error: 'Not found' })
+  await emitOrder(req.params.id)
+  res.json(q)
+}))
+
+app.post('/api/quotations/:id/submit', auth, wrap(async (req, res) => {
+  // In the old code, this did risk routing and created an approval.
+  // Wait, I didn't write this logic in db/quotations.js
+  // Let's implement it directly here using the DB functions.
+  
+  const q = await quotDb.getQuotation(req.params.id)
+  if (!q) return res.status(404).json({ error: 'Not found' })
+  if (q.lines.length === 0) return res.status(400).json({ error: 'Cannot submit an empty quotation' })
+
+  const { query } = await import('./db/pool.js')
+  const { requiredApprovalLevel, nextId } = await import('./db/helpers.js')
+  
+  const level = requiredApprovalLevel(q.riskLevel)
+  let approvalId
+  
+  // Check 70% rule: does any line item's qty exceed 70% of that product's total warehouse stock?
+  let requiresFinance = false;
+  for (const l of q.lines) {
+    const { rows: stockRows } = await query(
+      'SELECT COALESCE(SUM(in_stock), 0)::int AS total_stock FROM stock WHERE product_id = $1',
+      [l.productId]
+    );
+    const totalStock = stockRows[0]?.total_stock || 0;
+    if (totalStock > 0 && (Number(l.qty) / totalStock) > 0.70) {
+      requiresFinance = true;
+      break;
     }
   }
-  const totalDealValue = visible.reduce((sum, q) => sum + q.amount, 0)
-  const avgDiscount = valueWeight === 0 ? 0 : discountWeight / valueWeight
-  res.json({
-    pendingApprovals,
-    openQuotations,
-    atRiskDeals,
-    totalDealValue,
-    avgDiscount: Math.round(avgDiscount * 10) / 10,
-    deals: visible.map((q) => ({
-      id: q.id,
-      number: q.number,
-      customerName: q.customerName,
-      amount: q.amount,
-      status: q.status,
-      riskScore: q.riskScore,
-      riskLevel: q.riskLevel,
-    })),
-    activity: db.activity,
-  })
-})
 
-app.get('/api/quotations', auth, (req, res) => {
-  const items = db.quotations
-    .filter((q) => quotationVisibleTo(q, req.user))
-    .map((q) => listItem(computeQuotationRisk(q)))
-  res.json({ items })
-})
-
-app.post('/api/quotations', auth, requireRoles(['rep', 'manager', 'admin']), (req, res) => {
-  const customerId = req.body?.customerId || db.customers[0].id
-  const customer = db.customers.find((c) => c.id === customerId)
-  if (!customer) return res.status(400).json({ error: 'Unknown customer' })
-  const seq = 1049 + db.quotations.length
-  const quotation = computeQuotationRisk({
-    id: nextId('q', db.quotations),
-    number: `Q-${seq}`,
-    customerId: customer.id,
-    date: new Date().toISOString(),
-    repId: req.user.id,
-    repName: req.user.name,
-    status: 'draft',
-    currency: 'USD',
-    region: customer.region,
-    terms: customer.terms,
-    priceListId: req.body?.priceListId || 'pl-usd',
-    lines: [],
-  })
-  db.quotations.unshift(quotation)
-  logActivity(`${customer.name} draft quotation ${quotation.number} created by ${req.user.name}`)
-  res.status(201).json({ ...quotation, upsells: getUpsells(quotation) })
-})
-
-app.get('/api/quotations/:id', auth, (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
-  if (!quotationVisibleTo(quotation, req.user)) {
-    return res.status(403).json({ error: 'This draft belongs to another user.' })
-  }
-  computeQuotationRisk(quotation)
-  res.json({ ...quotation, upsells: getUpsells(quotation) })
-})
-
-function refuseUnlessOwner(req, res, quotation) {
-  if (!quotation) {
-    res.status(404).json({ error: 'Quotation not found' })
-    return false
-  }
-  if (!canMutateQuotation(quotation, req.user)) {
-    res.status(403).json({
-      error:
-        quotation.repId === req.user.id
-          ? 'This quotation is locked.'
-          : 'Only the owner can complete this draft.',
-    })
-    return false
-  }
-  return true
-}
-
-app.patch('/api/quotations/:id', auth, (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!refuseUnlessOwner(req, res, quotation)) return
-  const { customerId, priceListId, region, terms, currency } = req.body || {}
-  if (customerId) {
-    const customer = db.customers.find((c) => c.id === customerId)
-    if (!customer) return res.status(400).json({ error: 'Unknown customer' })
-    quotation.customerId = customer.id
-    quotation.region = customer.region
-    quotation.terms = customer.terms
-  }
-  if (priceListId) quotation.priceListId = priceListId
-  if (region) quotation.region = region
-  if (terms) quotation.terms = terms
-  if (currency) quotation.currency = currency
-  computeQuotationRisk(quotation)
-  res.json({ ...quotation, upsells: getUpsells(quotation) })
-})
-
-app.post('/api/quotations/:id/lines', auth, (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!refuseUnlessOwner(req, res, quotation)) return
-  const product = db.products.find((p) => p.id === req.body?.productId)
-  if (!product) return res.status(400).json({ error: 'Unknown product' })
-  quotation.lines.push({
-    id: nextId('l', quotation.lines),
-    productId: product.id,
-    productName: product.name,
-    category: product.category,
-    qty: Number(req.body?.qty) || 1,
-    price: product.price,
-    discountPercent: Number(req.body?.discountPercent) || 0,
-    comment: '',
-  })
-  computeQuotationRisk(quotation)
-  res.json({ ...quotation, upsells: getUpsells(quotation) })
-})
-
-app.patch('/api/quotations/:id/lines/:lineId', auth, (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!refuseUnlessOwner(req, res, quotation)) return
-  const line = quotation.lines.find((l) => l.id === req.params.lineId)
-  if (!line) return res.status(404).json({ error: 'Line not found' })
-  if (req.body?.discountPercent !== undefined) {
-    line.discountPercent = Math.max(0, Math.min(80, Number(req.body.discountPercent)))
-  }
-  if (req.body?.qty !== undefined) line.qty = Math.max(1, Number(req.body.qty))
-  computeQuotationRisk(quotation)
-  emitOrder(quotation.id)
-  res.json({ ...quotation, upsells: getUpsells(quotation) })
-})
-
-app.delete('/api/quotations/:id/lines/:lineId', auth, (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!refuseUnlessOwner(req, res, quotation)) return
-  quotation.lines = quotation.lines.filter((l) => l.id !== req.params.lineId)
-  computeQuotationRisk(quotation)
-  res.json({ ...quotation, upsells: getUpsells(quotation) })
-})
-
-app.post('/api/quotations/:id/submit', auth, (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!refuseUnlessOwner(req, res, quotation)) return
-  if (quotation.lines.length === 0) {
-    return res.status(400).json({ error: 'Cannot submit an empty quotation' })
-  }
-  computeQuotationRisk(quotation)
-  const level = requiredApprovalLevel(quotation)
-  if (level === 'none') {
-    quotation.status = 'confirmed'
-    quotation.portalStatus = 'confirmed'
-    let approval = db.approvals.find((a) => a.quotationId === quotation.id)
-    if (!approval) {
-      approval = {
-        id: nextId('a', db.approvals),
-        quotationId: quotation.id,
-        status: 'approved',
-        stage: 'confirmed',
-        assignedTo: '—',
-        assignedRole: 'none',
-        daysPending: 0,
-        auditLog: [],
-      }
-      db.approvals.unshift(approval)
+  if (level === 'none' && !requiresFinance) {
+    // Both filters pass: Goes to customer directly
+    await query("UPDATE quotations SET status = 'approved', portal_status = 'sent' WHERE id = $1", [q.id])
+    
+    // Auto-approve the internal steps
+    const { rows: existingA } = await query('SELECT id FROM approvals WHERE quotation_id = $1', [q.id])
+    if (existingA.length > 0) {
+      approvalId = existingA[0].id
+      await query("UPDATE approvals SET status = 'approved', stage = 'confirmed', assigned_to = '—', assigned_role = 'none' WHERE id = $1", [approvalId])
+    } else {
+      approvalId = nextId('a')
+      await query(`INSERT INTO approvals (id, quotation_id, status, stage, assigned_to, assigned_role, days_pending) VALUES ($1, $2, 'approved', 'confirmed', '—', 'none', 0)`, [approvalId, q.id])
     }
-    approval.status = 'approved'
-    approval.stage = 'confirmed'
-    appendAudit(approval, req.user, 'Submitted', 'Within policy — no approval required.')
-    appendAudit(approval, { id: 'system', name: 'System' }, 'Auto-approved', `Risk ${quotation.riskLevel} (${quotation.riskScore}).`)
-    createFulfillmentFromQuote(quotation)
-    logActivity(`${quotation.customerName} quotation ${quotation.number} confirmed (no approval required)`)
-    emitOrder(quotation.id)
-    return res.json({
-      quotation,
-      approvalRequired: false,
-      approvalId: approval.id,
-      riskScore: quotation.riskScore,
-      riskLevel: quotation.riskLevel,
-    })
-  }
 
-  quotation.status = 'pending_approval'
-  quotation.portalStatus = 'sent'
-  let approval = db.approvals.find((a) => a.quotationId === quotation.id)
-  if (!approval) {
-    approval = {
-      id: nextId('a', db.approvals),
-      quotationId: quotation.id,
-      status: 'pending',
-      stage: 'sales_manager',
-      assignedTo: 'Jordan Chen',
-      assignedRole: 'manager',
-      daysPending: 0,
-      auditLog: [],
-    }
-    db.approvals.unshift(approval)
-  }
-  approval.status = 'pending'
-  approval.stage = 'sales_manager'
-  approval.assignedTo = 'Jordan Chen'
-  approval.assignedRole = 'manager'
-  appendAudit(
-    approval,
-    req.user,
-    'Submitted',
-    `Blended risk ${quotation.riskLevel} (${quotation.riskScore}). Routing to ${level === 'finance' ? 'Sales Manager then Finance' : 'Sales Manager'}.`,
-  )
-  logActivity(
-    `${quotation.customerName} quotation ${quotation.number} submitted for approval (blended ${quotation.riskLevel})`,
-  )
-  emitOrder(quotation.id)
-  res.json({
-    quotation,
-    approvalRequired: true,
-    approvalId: approval.id,
-    riskScore: quotation.riskScore,
-    riskLevel: quotation.riskLevel,
-  })
-})
-
-function createFulfillmentFromQuote(quotation) {
-  if (db.fulfillment.some((f) => f.quotationId === quotation.id)) return
-  const hardware = quotation.lines.filter((l) => l.category === 'Hardware')
-  db.fulfillment.unshift({
-    id: nextId('f', db.fulfillment),
-    quotationId: quotation.id,
-    orderNumber: quotation.number.replace('Q-', 'SO-'),
-    customerId: quotation.customerId,
-    customerName: quotation.customerName,
-    status: hardware.length ? 'ready' : 'ready',
-    warehouse: 'East DC',
-    lines: quotation.lines.map((l) => ({
-      productId: l.productId,
-      productName: l.productName,
-      qty: l.qty,
-      suggested: [
-        {
-          warehouse: l.category === 'Services' ? 'Services desk' : 'East DC',
-          qtyFulfilled: l.qty,
-          estShipments: 1,
-          cost: l.category === 'Services' ? 0 : 120,
-          available: 20,
-        },
-      ],
-    })),
-  })
-}
-
-app.get('/api/approvals', auth, (_req, res) => {
-  const items = db.approvals.map((a) => {
-    const q = db.quotations.find((x) => x.id === a.quotationId)
-    computeQuotationRisk(q)
-    return {
-      id: a.id,
-      quotationId: q.id,
-      quotationNumber: q.number,
-      customerName: q.customerName,
-      blendedRisk: q.blendedRisk,
-      riskLevel: q.riskLevel,
-      riskScore: q.riskScore,
-      stage: a.stage,
-      assignedTo: a.assignedTo,
-      status: a.status,
-      daysPending: a.daysPending,
-      amount: q.amount,
-    }
-  })
-  res.json({ items })
-})
-
-app.get('/api/approvals/:id', auth, (req, res) => {
-  const approval = db.approvals.find((a) => a.id === req.params.id)
-  if (!approval) return res.status(404).json({ error: 'Approval not found' })
-  res.json(approvalDetail(approval))
-})
-
-function canActOnStep(user, approval) {
-  if (user.role === 'admin') return true
-  if (approval.stage === 'sales_manager' && ['manager', 'finance'].includes(user.role)) return true
-  if (approval.stage === 'finance' && user.role === 'finance') return true
-  return false
-}
-
-app.post('/api/approvals/:id/approve', auth, (req, res) => {
-  const approval = db.approvals.find((a) => a.id === req.params.id)
-  if (!approval) return res.status(404).json({ error: 'Approval not found' })
-  if (!canActOnStep(req.user, approval)) return res.status(403).json({ error: 'Not assigned to this step' })
-  const quotation = db.quotations.find((q) => q.id === approval.quotationId)
-  const note = String(req.body?.note || 'Approved.')
-  if (approval.stage === 'sales_manager' && requiredApprovalLevel(quotation) === 'finance') {
-    approval.stage = 'finance'
-    approval.assignedTo = 'Sam Patel'
-    approval.assignedRole = 'finance'
-    approval.status = 'pending'
-    appendAudit(approval, req.user, 'Approved', `${note} Routed to Finance.`)
+    await query(`INSERT INTO approval_audit_log (approval_id, user_name, user_id, action, date, note) VALUES ($1, $2, $3, 'Submitted', $4, 'Within policy and quantity limits. Sent to customer.')`, [approvalId, req.user.name, req.user.id, new Date().toISOString()])
+    await actDb.logActivity(`${q.customerName} quotation ${q.number} sent to customer (no internal approval required)`)
   } else {
-    approval.stage = 'confirmed'
-    approval.status = 'approved'
-    approval.assignedTo = '—'
-    quotation.status = 'confirmed'
-    quotation.portalStatus = 'confirmed'
-    appendAudit(approval, req.user, 'Approved', note)
-    createFulfillmentFromQuote(quotation)
+    await query("UPDATE quotations SET status = 'pending_approval', portal_status = 'sent' WHERE id = $1", [q.id])
+    
+    const { rows: existingA } = await query('SELECT id FROM approvals WHERE quotation_id = $1', [q.id])
+    const initialStage = level !== 'none' ? 'sales_manager' : 'finance';
+    const initialAssignedTo = initialStage === 'sales_manager' ? 'Jordan Chen' : 'Sam Patel';
+    const initialAssignedRole = initialStage === 'sales_manager' ? 'manager' : 'finance';
+
+    if (existingA.length > 0) {
+      approvalId = existingA[0].id
+      await query("UPDATE approvals SET status = 'pending', stage = $1, assigned_to = $2, assigned_role = $3 WHERE id = $4", [initialStage, initialAssignedTo, initialAssignedRole, approvalId])
+    } else {
+      approvalId = nextId('a')
+      await query(`INSERT INTO approvals (id, quotation_id, status, stage, assigned_to, assigned_role, days_pending) VALUES ($1, $2, 'pending', $3, $4, $5, 0)`, [approvalId, q.id, initialStage, initialAssignedTo, initialAssignedRole])
+    }
+    
+    let reason = level !== 'none' ? `Blended risk ${q.riskLevel} (${q.riskScore}).` : `70% quantity rule triggered.`
+    await query(`INSERT INTO approval_audit_log (approval_id, user_name, user_id, action, date, note) VALUES ($1, $2, $3, 'Submitted', $4, $5)`, [approvalId, req.user.name, req.user.id, new Date().toISOString(), `${reason} Routing to ${initialStage === 'sales_manager' ? 'Sales Manager' : 'Finance'}.`])
+    await actDb.logActivity(`${q.customerName} quotation ${q.number} submitted for approval`)
   }
-  logActivity(`${quotation.customerName} quotation ${quotation.number} approved by ${req.user.name}`)
-  const detail = approvalDetail(approval)
-  emitOrder(quotation.id)
-  res.json(detail)
-})
-
-app.post('/api/approvals/:id/return', auth, (req, res) => {
-  const approval = db.approvals.find((a) => a.id === req.params.id)
-  if (!approval) return res.status(404).json({ error: 'Approval not found' })
-  if (!canActOnStep(req.user, approval)) return res.status(403).json({ error: 'Not assigned to this step' })
-  const quotation = db.quotations.find((q) => q.id === approval.quotationId)
-  const note = String(req.body?.note || 'Returned for revision.')
-  approval.status = 'returned'
-  approval.stage = 'submitted'
-  approval.assignedTo = quotation.repName
-  quotation.status = 'returned'
-  appendAudit(approval, req.user, 'Returned', note)
-  logActivity(`${quotation.number} returned for revision by ${req.user.name}`)
-  const detail = approvalDetail(approval)
-  emitOrder(quotation.id)
-  res.json(detail)
-})
-
-app.post('/api/approvals/:id/reject', auth, (req, res) => {
-  const approval = db.approvals.find((a) => a.id === req.params.id)
-  if (!approval) return res.status(404).json({ error: 'Approval not found' })
-  if (!canActOnStep(req.user, approval)) return res.status(403).json({ error: 'Not assigned to this step' })
-  const quotation = db.quotations.find((q) => q.id === approval.quotationId)
-  const note = String(req.body?.note || 'Rejected.')
-  approval.status = 'rejected'
-  quotation.status = 'rejected'
-  quotation.portalStatus = 'rejected'
-  appendAudit(approval, req.user, 'Rejected', note)
-  logActivity(`${quotation.number} rejected by ${req.user.name}`)
-  const detail = approvalDetail(approval)
-  emitOrder(quotation.id)
-  res.json(detail)
-})
-
-app.get('/api/fulfillment', auth, (_req, res) => {
+  
+  await emitOrder(q.id)
+  
+  // Re-fetch to return latest state
+  const updatedQ = await quotDb.getQuotation(q.id)
   res.json({
-    stock: db.stock.map((s) => ({
-      ...s,
-      available: Math.max(0, s.inStock - s.reserved),
-    })),
-    orders: db.fulfillment.map((f) => ({
-      id: f.id,
-      orderNumber: f.orderNumber,
-      customerName: f.customerName,
-      status: f.status,
-      warehouse: f.warehouse,
-      canConsolidate: canConsolidateBackorder(f),
-      remainingQty: remainingBackorderQty(f),
-    })),
+    quotation: updatedQ,
+    approvalRequired: level !== 'none',
+    approvalId,
+    riskScore: updatedQ.riskScore,
+    riskLevel: updatedQ.riskLevel,
   })
-})
+}))
 
-app.get('/api/fulfillment/:id', auth, (req, res) => {
-  const order = db.fulfillment.find((f) => f.id === req.params.id)
-  if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
-  res.json({
-    ...order,
-    canConsolidate: canConsolidateBackorder(order),
-    remainingQty: remainingBackorderQty(order),
-  })
-})
+// ── Approvals ────────────────────────────────────────────────────────
 
-app.post('/api/fulfillment/:id/accept-split', auth, requireRoles(['finance', 'admin']), (req, res) => {
-  const order = db.fulfillment.find((f) => f.id === req.params.id)
-  if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
-  order.status = 'ready'
-  order.splitAccepted = true
-  logActivity(`${order.orderNumber} split shipment accepted by ${req.user.name}`)
-  io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: order.id })
-  res.json({ ...order, canConsolidate: canConsolidateBackorder(order), remainingQty: remainingBackorderQty(order) })
-})
+app.get('/api/approvals', auth, wrap(async (_req, res) => {
+  res.json({ items: await appDb.listApprovals() })
+}))
 
-app.post('/api/fulfillment/:id/override', auth, requireRoles(['finance', 'admin']), (req, res) => {
-  const order = db.fulfillment.find((f) => f.id === req.params.id)
-  if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
-  if (Array.isArray(req.body?.lines)) {
-    order.lines = req.body.lines
-  }
-  order.status = req.body?.status || 'ready'
-  order.overridden = true
-  logActivity(`${order.orderNumber} inventory override by ${req.user.name}`)
-  io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: order.id })
-  res.json({ ...order, canConsolidate: canConsolidateBackorder(order), remainingQty: remainingBackorderQty(order) })
-})
+app.get('/api/approvals/:id', auth, wrap(async (req, res) => {
+  const data = await appDb.getApproval(req.params.id)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.post('/api/fulfillment/:id/consolidate', auth, (req, res) => {
-  const order = db.fulfillment.find((f) => f.id === req.params.id)
-  if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
-  if (!canConsolidateBackorder(order)) {
-    return res.status(400).json({ error: 'Remaining backorder cannot be consolidated yet' })
-  }
-  consolidateBackorder(order)
-  logActivity(`${order.orderNumber} remaining backorder consolidated by ${req.user.name}`)
-  io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: order.id })
-  res.json({ ...order, canConsolidate: false, remainingQty: remainingBackorderQty(order) })
-})
+app.post('/api/approvals/:id/approve', auth, wrap(async (req, res) => {
+  const result = await appDb.approveApproval(req.params.id, req.user, req.body?.note)
+  if (result.error) return res.status(result.status).json({ error: result.error })
+  await emitOrder(result.data.quotationId)
+  res.json(result.data)
+}))
 
-app.get('/api/subscriptions', auth, (_req, res) => {
-  res.json({ items: db.subscriptions })
-})
+app.post('/api/approvals/:id/return', auth, wrap(async (req, res) => {
+  const result = await appDb.returnApproval(req.params.id, req.user, req.body?.note)
+  if (result.error) return res.status(result.status).json({ error: result.error })
+  await emitOrder(result.data.quotationId)
+  res.json(result.data)
+}))
 
-app.post('/api/subscriptions', auth, requireRoles(['admin']), (req, res) => {
-  const customer = db.customers.find((c) => c.id === req.body?.customerId) || db.customers[0]
-  const sub = {
-    id: nextId('s', db.subscriptions),
-    customerId: customer.id,
-    customerName: customer.name,
-    plan: req.body?.plan || 'Custom Plan',
-    cycle: req.body?.cycle || 'annual',
-    nextBill: req.body?.nextBill || '2026-10-01',
-    amount: Number(req.body?.amount) || 0,
-    status: 'active',
-    originatingOrderId: req.body?.originatingOrderId || null,
-    oneTimeLines: [],
-    recurringLines: [
-      {
-        plan: req.body?.plan || 'Custom Plan',
-        cycle: req.body?.cycle || 'annual',
-        nextBillDate: req.body?.nextBill || '2026-10-01',
-        amount: Number(req.body?.amount) || 0,
-      },
-    ],
-  }
-  db.subscriptions.unshift(sub)
-  res.status(201).json(sub)
-})
+app.post('/api/approvals/:id/reject', auth, wrap(async (req, res) => {
+  const result = await appDb.rejectApproval(req.params.id, req.user, req.body?.note)
+  if (result.error) return res.status(result.status).json({ error: result.error })
+  await emitOrder(result.data.quotationId)
+  res.json(result.data)
+}))
 
-app.get('/api/subscriptions/:id', auth, (req, res) => {
-  const sub = db.subscriptions.find((s) => s.id === req.params.id)
-  if (!sub) return res.status(404).json({ error: 'Subscription not found' })
-  res.json(sub)
-})
+// ── Fulfillment ──────────────────────────────────────────────────────
 
-app.post('/api/subscriptions/:id/cancel', auth, (req, res) => {
-  const sub = db.subscriptions.find((s) => s.id === req.params.id)
-  if (!sub) return res.status(404).json({ error: 'Subscription not found' })
-  sub.status = 'cancelled'
-  logActivity(`${sub.plan} for ${sub.customerName} cancelled by ${req.user.name}`)
-  res.json(sub)
-})
+app.get('/api/fulfillment', auth, wrap(async (_req, res) => {
+  res.json(await fulfillDb.listFulfillment())
+}))
 
-app.post('/api/subscriptions/:id/modify', auth, (req, res) => {
-  const sub = db.subscriptions.find((s) => s.id === req.params.id)
-  if (!sub) return res.status(404).json({ error: 'Subscription not found' })
-  if (req.body?.plan) sub.plan = String(req.body.plan)
-  if (req.body?.cycle) sub.cycle = req.body.cycle
-  if (req.body?.amount !== undefined) sub.amount = Number(req.body.amount)
-  if (req.body?.status) sub.status = req.body.status
-  if (req.body?.nextBill) sub.nextBill = req.body.nextBill
-  if (sub.recurringLines[0]) {
-    sub.recurringLines[0].plan = sub.plan
-    sub.recurringLines[0].cycle = sub.cycle
-    sub.recurringLines[0].amount = sub.amount
-    if (req.body?.nextBill) sub.recurringLines[0].nextBillDate = req.body.nextBill
-  }
-  logActivity(`${sub.plan} for ${sub.customerName} modified by ${req.user.name}`)
-  res.json(sub)
-})
+app.get('/api/fulfillment/:id', auth, wrap(async (req, res) => {
+  const data = await fulfillDb.getFulfillmentOrder(req.params.id)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.get('/api/invoices', auth, (_req, res) => {
-  res.json({ items: db.invoices })
-})
+app.post('/api/fulfillment/:id/accept-split', auth, requireRoles(['finance', 'admin']), wrap(async (req, res) => {
+  const data = await fulfillDb.acceptSplit(req.params.id, req.user.name)
+  io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: req.params.id })
+  res.json(data)
+}))
 
-app.get('/api/invoices/:id', auth, (req, res) => {
-  const invoice = db.invoices.find((i) => i.id === req.params.id)
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
-  res.json(invoice)
-})
+app.post('/api/fulfillment/:id/override', auth, requireRoles(['finance', 'admin']), wrap(async (req, res) => {
+  const data = await fulfillDb.overrideFulfillment(req.params.id, req.body, req.user.name)
+  io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: req.params.id })
+  res.json(data)
+}))
 
-function applyInvoiceStatus(invoice, status, user) {
-  const paid = status === 'paid'
-  invoice.status = paid ? 'paid' : 'unpaid'
-  invoice.step = paid ? 'paid' : 'invoiced'
-  invoice.lines = invoice.lines.map((l) => ({ ...l, status: invoice.status }))
-  if (paid) {
-    const labels = {
-      rep: 'Sales Rep',
-      manager: 'Sales Manager',
-      finance: 'Finance',
-      admin: 'Administrator',
-    }
-    invoice.paymentRecordedBy = {
-      name: user.name,
-      role: user.role,
-      roleLabel: labels[user.role] || user.role,
-    }
-  } else {
-    invoice.paymentRecordedBy = null
-  }
-  logActivity(`Invoice ${invoice.number} marked ${invoice.status} by ${user.name}`)
-  io.to('workspace').emit('workspace:updated', { type: 'invoice', id: invoice.id })
-  return invoice
-}
+// ── Subscriptions ────────────────────────────────────────────────────
 
-app.post('/api/invoices/:id/record-payment', auth, requireRoles(['rep', 'manager', 'admin']), (req, res) => {
-  const invoice = db.invoices.find((i) => i.id === req.params.id)
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
-  res.json(applyInvoiceStatus(invoice, 'paid', req.user))
-})
+app.get('/api/subscriptions', auth, wrap(async (_req, res) => {
+  res.json({ items: await subDb.listSubscriptions() })
+}))
 
-app.post('/api/invoices/:id/status', auth, requireRoles(['rep', 'manager', 'admin']), (req, res) => {
-  const invoice = db.invoices.find((i) => i.id === req.params.id)
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
-  const status = req.body?.status === 'paid' ? 'paid' : 'unpaid'
-  res.json(applyInvoiceStatus(invoice, status, req.user))
-})
+app.post('/api/subscriptions', auth, requireRoles(['admin']), wrap(async (req, res) => {
+  res.status(201).json(await subDb.createSubscription(req.body))
+}))
 
-app.get('/api/deal-health', auth, (_req, res) => {
-  const stalled = db.dealHealth.filter((d) => d.type === 'stalled').length
-  const anomalies = db.dealHealth.filter((d) => d.type === 'anomaly').length
-  const slippage = db.dealHealth.filter((d) => d.type === 'slippage').length
-  const byStage = [
-    { stage: 'Draft', count: db.quotations.filter((q) => q.status === 'draft').length },
-    { stage: 'Pending', count: db.quotations.filter((q) => q.status === 'pending_approval').length },
-    { stage: 'Negotiation', count: db.quotations.filter((q) => q.status === 'negotiation').length },
-    { stage: 'Approved', count: db.quotations.filter((q) => q.status === 'approved').length },
-    { stage: 'Confirmed', count: db.quotations.filter((q) => q.status === 'confirmed').length },
-  ]
-  res.json({
-    stalled,
-    anomalies,
-    slippage,
-    items: db.dealHealth,
-    byStage,
-  })
-})
+app.get('/api/subscriptions/:id', auth, wrap(async (req, res) => {
+  const data = await subDb.getSubscription(req.params.id)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.post('/api/deal-health/:id/escalate', auth, (req, res) => {
-  const item = db.dealHealth.find((d) => d.id === req.params.id)
-  if (!item) return res.status(404).json({ error: 'Flag not found' })
-  logActivity(`${req.user.name} escalated ${item.deal}: ${item.issue}`)
-  item.escalated = true
-  res.json(item)
-})
+app.post('/api/subscriptions/:id/cancel', auth, wrap(async (req, res) => {
+  const data = await subDb.cancelSubscription(req.params.id, req.user.name)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.post('/api/deal-health/:id/nudge', auth, (req, res) => {
-  const item = db.dealHealth.find((d) => d.id === req.params.id)
-  if (!item) return res.status(404).json({ error: 'Flag not found' })
-  logActivity(`${req.user.name} nudged the rep on ${item.deal}`)
-  item.nudged = true
-  res.json(item)
-})
+app.post('/api/subscriptions/:id/modify', auth, wrap(async (req, res) => {
+  const data = await subDb.modifySubscription(req.params.id, req.body, req.user.name)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.get('/api/reports', auth, requireRoles(['admin']), (req, res) => {
-  const period = String(req.query.period || 'Q3 2026')
-  const team = String(req.query.team || 'All')
-  const status = String(req.query.status || 'All')
-  const product = String(req.query.product || 'All')
+// ── Invoices ─────────────────────────────────────────────────────────
 
-  const inPeriod = (isoDate) => {
-    const d = new Date(isoDate)
-    const y = d.getUTCFullYear()
-    const m = d.getUTCMonth()
-    if (period === 'YTD') return y === 2026
-    if (period === 'Q2 2026') return y === 2026 && m >= 3 && m <= 5
-    return y === 2026 && m >= 6 && m <= 8
-  }
+app.get('/api/invoices', auth, wrap(async (_req, res) => {
+  res.json({ items: await invDb.listInvoices() })
+}))
 
-  let quotes = db.quotations.filter((q) => inPeriod(q.date))
-  if (team !== 'All') quotes = quotes.filter((q) => q.region === team)
-  if (status === 'Pending') quotes = quotes.filter((q) => q.status === 'pending_approval')
-  if (status === 'Approved') {
-    quotes = quotes.filter((q) => ['approved', 'confirmed', 'negotiation'].includes(q.status))
-  }
-  if (product !== 'All') quotes = quotes.filter((q) => q.lines.some((l) => l.productName === product))
+app.get('/api/invoices/:id', auth, wrap(async (req, res) => {
+  const data = await invDb.getInvoice(req.params.id)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-  const quoteIds = new Set(quotes.map((q) => q.id))
-  const durations = db.approvals
-    .filter((a) => quoteIds.has(a.quotationId))
-    .map((a) => {
-      const submitted = a.auditLog.find((e) => e.action === 'Submitted')
-      const approved = [...a.auditLog].reverse().find((e) => e.action === 'Approved' || e.action === 'Auto-approved')
-      if (submitted && approved) {
-        return Math.max(0, (new Date(approved.date) - new Date(submitted.date)) / 86400000)
-      }
-      return a.status === 'approved' ? a.daysPending : null
-    })
-    .filter((n) => n !== null)
-  const avgDays = durations.length ? durations.reduce((s, n) => s + n, 0) / durations.length : 0
+app.post('/api/invoices/:id/record-payment', auth, requireRoles(['rep', 'manager', 'finance', 'admin']), wrap(async (req, res) => {
+  const data = await invDb.recordPayment(req.params.id, req.user)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  io.to('workspace').emit('workspace:updated', { type: 'invoice', id: req.params.id })
+  res.json(data)
+}))
 
-  const productCounts = new Map()
-  for (const q of quotes) {
-    for (const line of q.lines) {
-      productCounts.set(line.productName, (productCounts.get(line.productName) || 0) + line.qty)
-    }
-  }
-  let topUpsellProduct = '—'
-  let topCount = 0
-  for (const [name, count] of productCounts) {
-    if (count > topCount) {
-      topUpsellProduct = name
-      topCount = count
-    }
-  }
+app.post('/api/invoices/:id/status', auth, requireRoles(['rep', 'manager', 'finance', 'admin']), wrap(async (req, res) => {
+  const data = await invDb.setInvoiceStatus(req.params.id, req.body?.status === 'paid' ? 'paid' : 'unpaid', req.user)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  io.to('workspace').emit('workspace:updated', { type: 'invoice', id: req.params.id })
+  res.json(data)
+}))
 
-  const teams = [...new Set(db.quotations.map((q) => q.region))].sort()
-  const products = [...new Set(db.products.map((p) => p.name))]
+// ── Deal Health ──────────────────────────────────────────────────────
 
-  res.json({
-    quotesCreated: quotes.length,
-    avgApprovalTime: durations.length ? `${avgDays.toFixed(1)} days` : '—',
-    topUpsellProduct,
-    filters: { period, team, status, product },
-    options: {
-      periods: ['Q3 2026', 'Q2 2026', 'YTD'],
-      teams,
-      statuses: ['All', 'Pending', 'Approved'],
-      products,
-    },
-  })
-})
+app.get('/api/deal-health', auth, wrap(async (_req, res) => {
+  res.json(await healthDb.getDealHealth())
+}))
 
-app.get('/api/products', auth, (_req, res) => {
-  res.json({
-    items: db.products,
-    stats: {
-      totalProducts: db.products.length,
-      pricelists: db.pricelists.length,
-      variants: db.products.reduce((n, p) => n + p.variants.length, 0),
-    },
-  })
-})
+app.post('/api/deal-health/:id/escalate', auth, wrap(async (req, res) => {
+  const data = await healthDb.escalate(req.params.id, req.user.name)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.post('/api/products', auth, requireRoles(['admin']), (req, res) => {
-  const product = {
-    id: nextId('p', db.products),
-    name: String(req.body?.name || 'Untitled product'),
-    category: req.body?.category === 'Services' ? 'Services' : 'Hardware',
-    price: Number(req.body?.price) || 0,
-    unit: String(req.body?.unit || 'unit'),
-    taxPercent: Number(req.body?.taxPercent) || 0,
-    status: 'active',
-    description: String(req.body?.description || ''),
-    isSubscription: Boolean(req.body?.isSubscription),
-    cycle: req.body?.isSubscription ? req.body?.cycle || 'annual' : null,
-    quantity: req.body?.isSubscription ? Number(req.body?.quantity) || 1 : null,
-    variants: Array.isArray(req.body?.variants) ? req.body.variants : [],
-  }
-  db.products.push(product)
-  res.status(201).json(product)
-})
+app.post('/api/deal-health/:id/nudge', auth, wrap(async (req, res) => {
+  const data = await healthDb.nudge(req.params.id, req.user.name)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.get('/api/products/:id', auth, (req, res) => {
-  const product = db.products.find((p) => p.id === req.params.id)
-  if (!product) return res.status(404).json({ error: 'Product not found' })
-  res.json({ product, pricelists: db.pricelists })
-})
+// ── Discount Config ──────────────────────────────────────────────────
 
-app.patch('/api/products/:id', auth, requireRoles(['admin']), (req, res) => {
-  const product = db.products.find((p) => p.id === req.params.id)
-  if (!product) return res.status(404).json({ error: 'Product not found' })
-  const fields = ['name', 'category', 'price', 'unit', 'taxPercent', 'status', 'description', 'isSubscription', 'cycle', 'quantity', 'variants']
-  for (const key of fields) {
-    if (req.body?.[key] !== undefined) product[key] = req.body[key]
-  }
-  if (Array.isArray(req.body?.pricelists)) {
-    for (const incoming of req.body.pricelists) {
-      const list = db.pricelists.find((p) => p.id === incoming.id)
-      if (list && Array.isArray(incoming.rules)) list.rules = incoming.rules
-    }
-  }
-  if (!product.isSubscription) {
-    product.cycle = null
-    product.quantity = null
-  }
-  res.json({ product, pricelists: db.pricelists })
-})
+app.get('/api/discount-config', auth, wrap(async (_req, res) => {
+  res.json(await confDb.getDiscountConfig())
+}))
 
-app.get('/api/discount-config', auth, (_req, res) => {
-  res.json(db.discountConfig)
-})
+app.post('/api/discount-config', auth, requireRoles(['admin']), wrap(async (req, res) => {
+  res.json(await confDb.saveDiscountConfig(req.body))
+}))
 
-app.post('/api/discount-config', auth, requireRoles(['admin']), (req, res) => {
-  if (req.body?.tierDiscounts) db.discountConfig.tierDiscounts = req.body.tierDiscounts
-  if (req.body?.categoryCeilings) db.discountConfig.categoryCeilings = req.body.categoryCeilings
-  if (req.body?.approvalChain) db.discountConfig.approvalChain = req.body.approvalChain
-  if (req.body?.thresholds) db.discountConfig.thresholds = req.body.thresholds
-  for (const q of db.quotations) computeQuotationRisk(q)
-  logActivity(`Discount configuration saved by ${req.user.name}`)
-  res.json(db.discountConfig)
-})
+// ── Portal ───────────────────────────────────────────────────────────
 
-app.get('/api/portal/quotes', auth, requireRoles(['customer']), (req, res) => {
-  const items = db.quotations
-    .filter((q) => q.customerId === req.user.customerId && q.status !== 'draft' && q.status !== 'returned')
-    .map(listItem)
-  res.json({ items })
-})
+app.post('/api/portal/quotes', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  const { lines } = req.body
+  if (!lines || lines.length === 0) return res.status(400).json({ error: 'Cart is empty' })
+  
+  const q = await portalDb.createPortalQuote(req.user, lines)
+  io.to('workspace').emit('workspace:updated', { type: 'quotation', id: q.id })
+  res.status(201).json(q)
+}))
 
-function portalQuotePayload(quotation) {
-  computeQuotationRisk(quotation)
-  const approval = db.approvals.find((a) => a.quotationId === quotation.id)
-  const history = [
-    ...(approval?.auditLog ?? []).map((e) => ({
-      from: e.user,
-      action: e.action,
-      body: e.note,
-      date: e.date,
-    })),
-    ...db.portalMessages
-      .filter((m) => m.quotationId === quotation.id)
-      .map((m) => ({
-        from: m.from,
-        action: 'Message',
-        body: m.body,
-        date: m.date,
-      })),
-  ].sort((a, b) => new Date(a.date) - new Date(b.date))
-  const safeLines = quotation.lines.map((l) => {
-    const product = db.products.find((p) => p.id === l.productId)
-    return {
-      id: l.id,
-      productName: l.productName,
-      description: product?.description || l.category || '',
-      qty: l.qty,
-      price: l.price,
-      discountPercent: l.discountPercent,
-      comment: l.comment || '',
-      counterDiscount: l.counterDiscount ?? l.discountPercent,
-      amount: l.qty * l.price * (1 - l.discountPercent / 100),
-      taxPercent: product?.taxPercent ?? 0,
-    }
-  })
-  return {
-    id: quotation.id,
-    number: quotation.number,
-    customerName: quotation.customerName,
-    amount: quotation.amount,
-    status: quotation.status,
-    portalStatus: quotation.portalStatus || (quotation.status === 'confirmed' ? 'confirmed' : 'sent'),
-    requestedDeliveryDate: quotation.requestedDeliveryDate || '',
-    currency: quotation.currency,
-    terms: quotation.terms,
-    date: quotation.date,
-    repName: quotation.repName,
-    region: quotation.region,
-    history,
-    lines: safeLines,
-  }
-}
+app.get('/api/portal/quotes', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  res.json({ items: await portalDb.listPortalQuotes(req.user.customerId) })
+}))
 
-app.get('/api/portal/quote/:id', auth, requireRoles(['customer']), (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (
-    !quotation ||
-    quotation.customerId !== req.user.customerId ||
-    quotation.status === 'draft' ||
-    quotation.status === 'returned'
-  ) {
-    return res.status(404).json({ error: 'Quotation not found' })
-  }
-  res.json(portalQuotePayload(quotation))
-})
+app.get('/api/portal/quote/:id', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  const data = await portalDb.getPortalQuote(req.params.id, req.user.customerId)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
 
-app.post('/api/portal/quote/:id/negotiate', auth, requireRoles(['customer']), (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation || quotation.customerId !== req.user.customerId) {
-    return res.status(404).json({ error: 'Quotation not found' })
-  }
-  if (quotation.status === 'confirmed' || quotation.portalStatus === 'confirmed') {
-    return res.status(409).json({ error: 'This quotation is already accepted.' })
-  }
-  const lines = Array.isArray(req.body?.lines) ? req.body.lines : []
-  for (const incoming of lines) {
-    const line = quotation.lines.find((l) => l.id === incoming.id)
-    if (!line) continue
-    if (incoming.comment !== undefined) line.comment = String(incoming.comment)
-    if (incoming.qty !== undefined) {
-      const qty = Number(incoming.qty)
-      if (Number.isFinite(qty)) line.qty = Math.max(1, Math.round(qty))
-    }
-    let nextDiscount = incoming.counterDiscount
-    if (incoming.unitPrice !== undefined && Number.isFinite(Number(incoming.unitPrice)) && line.price > 0) {
-      nextDiscount = (1 - Number(incoming.unitPrice) / line.price) * 100
-    }
-    if (nextDiscount !== undefined) {
-      const n = Number(nextDiscount)
-      if (!Number.isFinite(n)) continue
-      const clamped = Math.max(0, Math.min(80, n))
-      line.counterDiscount = clamped
-      line.discountPercent = clamped
-    }
-  }
-  if (req.body?.requestedDeliveryDate) {
-    quotation.requestedDeliveryDate = String(req.body.requestedDeliveryDate)
-  }
-  quotation.status = 'negotiation'
-  quotation.portalStatus = 'under_negotiation'
-  computeQuotationRisk(quotation)
-  let approval = db.approvals.find((a) => a.quotationId === quotation.id)
-  if (!approval) {
-    approval = {
-      id: nextId('a', db.approvals),
-      quotationId: quotation.id,
-      status: 'pending',
-      stage: 'sales_manager',
-      assignedTo: 'Jordan Chen',
-      assignedRole: 'manager',
-      daysPending: 0,
-      auditLog: [],
-    }
-    db.approvals.unshift(approval)
-  }
-  approval.status = 'pending'
-  if (quotation.riskLevel !== 'LOW') {
-    approval.stage = quotation.riskLevel === 'HIGH' ? 'sales_manager' : 'sales_manager'
-    approval.assignedTo = 'Jordan Chen'
-  }
-  appendAudit(
-    approval,
-    req.user,
-    'Negotiation',
-    req.body?.note ||
-      `Customer requested revised terms. Delivery ${quotation.requestedDeliveryDate || 'unchanged'}.`,
-  )
-  db.portalMessages.push({
-    id: nextId('m', db.portalMessages),
-    customerId: req.user.customerId,
-    quotationId: quotation.id,
-    from: req.user.name,
-    body: req.body?.note || 'Submitted a negotiation request from the portal.',
-    date: new Date().toISOString(),
-  })
-  logActivity(`${req.user.name} submitted a negotiation on ${quotation.number}`)
-  emitOrder(quotation.id)
-  res.json({ ok: true, quotationId: quotation.id, approvalId: approval.id })
-})
+app.post('/api/portal/quote/:id/negotiate', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  const result = await portalDb.negotiate(req.params.id, req.user.customerId, req.user, req.body)
+  if (!result) return res.status(404).json({ error: 'Not found' })
+  await emitOrder(result.quotationId)
+  res.json(result)
+}))
 
-app.post('/api/portal/quote/:id/confirm', auth, requireRoles(['customer']), (req, res) => {
-  const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation || quotation.customerId !== req.user.customerId) {
-    return res.status(404).json({ error: 'Quotation not found' })
-  }
-  if (quotation.status === 'confirmed' || quotation.portalStatus === 'confirmed') {
-    return res.json({ ok: true, reenteredApproval: false })
-  }
-  computeQuotationRisk(quotation)
-  const level = requiredApprovalLevel(quotation)
-  if (level !== 'none') {
-    quotation.status = 'pending_approval'
-    quotation.portalStatus = 'sent'
-    let approval = db.approvals.find((a) => a.quotationId === quotation.id)
-    if (!approval) {
-      approval = {
-        id: nextId('a', db.approvals),
-        quotationId: quotation.id,
-        status: 'pending',
-        stage: 'sales_manager',
-        assignedTo: 'Jordan Chen',
-        assignedRole: 'manager',
-        daysPending: 0,
-        auditLog: [],
-      }
-      db.approvals.unshift(approval)
-    }
-    approval.status = 'pending'
-    approval.stage = 'sales_manager'
-    appendAudit(approval, req.user, 'Confirm attempted', 'Terms exceed thresholds — quote re-entered approval.')
-    logActivity(`${quotation.number} re-entered approval after customer confirm (over threshold)`)
-    emitOrder(quotation.id)
-    return res.json({ ok: true, reenteredApproval: true, approvalId: approval.id })
-  }
-  quotation.status = 'confirmed'
-  quotation.portalStatus = 'confirmed'
-  createFulfillmentFromQuote(quotation)
-  const approval = db.approvals.find((a) => a.quotationId === quotation.id)
-  if (approval) {
-    approval.status = 'approved'
-    approval.stage = 'confirmed'
-    appendAudit(approval, req.user, 'Confirmed', 'Customer confirmed quotation from portal.')
-  }
-  logActivity(`${req.user.name} confirmed quotation ${quotation.number}`)
-  emitOrder(quotation.id)
-  res.json({ ok: true, reenteredApproval: false })
-})
+app.post('/api/portal/quote/:id/confirm', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  const result = await portalDb.confirmPortalQuote(req.params.id, req.user.customerId, req.user)
+  if (!result) return res.status(404).json({ error: 'Not found' })
+  await emitOrder(req.params.id)
+  res.json(result)
+}))
 
-app.get('/api/portal/messages', auth, requireRoles(['customer']), (req, res) => {
-  const items = db.portalMessages.filter((m) => m.customerId === req.user.customerId)
-  res.json({ items })
-})
+app.get('/api/portal/messages', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  res.json({ items: await portalDb.listPortalMessages(req.user.customerId) })
+}))
 
-app.get('/api/portal/profile', auth, requireRoles(['customer']), (req, res) => {
-  const customer = db.customers.find((c) => c.id === req.user.customerId)
-  res.json({ user: req.user, customer })
-})
+app.get('/api/portal/profile', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  res.json(await portalDb.getPortalProfile(req.user))
+}))
+
+// ── Error handler & Boot ─────────────────────────────────────────────
 
 app.use((err, _req, res, _next) => {
   if (err?.type === 'entity.parse.failed') {
@@ -1057,5 +477,5 @@ app.use((err, _req, res, _next) => {
 })
 
 httpServer.listen(PORT, () => {
-  console.log(`DealFlow360 API on http://localhost:${PORT}`)
+  console.log(`DealFlow360 API on http://localhost:${PORT} (PostgreSQL Backend)`)
 })

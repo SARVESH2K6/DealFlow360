@@ -1,0 +1,48 @@
+DealFlow360 Project Overview
+
+# Introduction
+DealFlow360 is an internal B2B sales operations workspace. It consists of a React 18 frontend (built with Vite) and a Node.js backend using Express. 
+The application serves two main audiences: 
+1. Internal employees with role-gated access (Sales Reps, Sales Managers, Finance, Admins).
+2. Customers who access a separate customer portal to view and negotiate quotations.
+
+# Tech Stack
+- Frontend: React 18, Vite, Tailwind CSS, Lucide React (icons), Recharts (charts), React Router, React Query.
+- Backend: Node.js, Express, Socket.IO (for real-time updates).
+- Database: In-memory arrays for development (defined in `server/store.js`), seeded with initial dummy data.
+- Authentication: JSON Web Tokens (JWT).
+
+# Key Features and Modules
+1. Quotations Management: 
+   - Sales reps can create draft quotations for customers, add products (Hardware/Services), and apply discounts.
+   - Quotations are subject to a robust risk-scoring engine (`computeQuotationRisk` in `server/store.js`). Based on discount limits defined per tier and category, the quotation is assigned a risk level (LOW, MEDIUM, HIGH).
+
+2. Approvals Workflow:
+   - Low-risk quotes are auto-approved.
+   - Medium-risk quotes require Sales Manager approval.
+   - High-risk quotes require both Sales Manager and Finance approval.
+   - Approvers can approve, reject, or return quotes for revision.
+
+3. Customer Portal:
+   - Customers can log in, view their quotations, and propose counter-discounts or add notes. This triggers a negotiation phase and routes the quote back to the sales manager.
+   - Real-time updates via Socket.IO ensure that multiple users (e.g., a customer and a sales manager on different laptops) see state changes instantly.
+
+4. Fulfillment & Inventory:
+   - Confirmed quotes automatically generate fulfillment orders.
+   - Stock quantities are tracked across multiple warehouses. Orders can be split across warehouses or overridden if stock is low.
+
+5. Subscriptions & Invoicing:
+   - Supports subscription-based products (e.g., Predictive Maintenance Suite) with recurring billing cycles.
+   - Invoices are generated and tracked for payments.
+
+6. Deal Health & Activity:
+   - Tracks stalled deals, anomalies, and slippage. Sales reps can be "nudged", or deals can be escalated.
+   - Audit logs and activity feeds track actions across the system.
+
+# Code Architecture
+- `server/index.js`: The main Express server file. It sets up middlewares, Socket.IO, authentication logic, and defines all REST API endpoints for the features mentioned above.
+- `server/store.js`: The in-memory data store. It contains initial seed data (`db`), business logic like `computeQuotationRisk` (calculating overages on limits and assigning risk scores), and `getUpsells` (suggesting related products).
+- `src/`: The React frontend, organized by features (e.g., `src/features/quotations`, `src/features/approvals`, etc.). `src/routes/AppRouter.tsx` handles the client-side routing and role-based layouts.
+
+# Running the App
+The project is run using concurrently via `npm run dev`, which starts both the Vite client (port 5173) and the Express server (port 3001) simultaneously.
