@@ -138,10 +138,33 @@ app.get('/api/dashboard/summary', auth, (_req, res) => {
     ['draft', 'pending_approval', 'negotiation'].includes(q.status),
   ).length
   const atRiskDeals = db.dealHealth.length
+  let valueWeight = 0
+  let discountWeight = 0
+  for (const q of db.quotations) {
+    computeQuotationRisk(q)
+    for (const line of q.lines) {
+      const v = line.qty * line.price
+      valueWeight += v
+      discountWeight += v * line.discountPercent
+    }
+  }
+  const totalDealValue = db.quotations.reduce((sum, q) => sum + q.amount, 0)
+  const avgDiscount = valueWeight === 0 ? 0 : discountWeight / valueWeight
   res.json({
     pendingApprovals,
     openQuotations,
     atRiskDeals,
+    totalDealValue,
+    avgDiscount: Math.round(avgDiscount * 10) / 10,
+    deals: db.quotations.map((q) => ({
+      id: q.id,
+      number: q.number,
+      customerName: q.customerName,
+      amount: q.amount,
+      status: q.status,
+      riskScore: q.riskScore,
+      riskLevel: q.riskLevel,
+    })),
     activity: db.activity,
   })
 })

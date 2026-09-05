@@ -35,29 +35,33 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="w-full max-w-[380px] rounded-md border border-border bg-surface p-6">
-        <h1 className="text-[20px] font-medium text-ink">DealFlow360</h1>
-        <p className="mt-1 text-[13px] text-inkMuted">Internal sales operations</p>
+    <div className="flex min-h-screen items-center justify-center px-6 py-16">
+      <div className="w-full max-w-[420px] bg-sheet px-10 py-12 shadow-sheet">
+        <div className="rule-double" />
+        <p className="mt-6 font-serif text-[22px] text-commit">DealFlow360</p>
+        <h1 className="mt-5 font-serif text-[34px] leading-tight text-ink">
+          {mode === 'login' ? 'Sign in' : 'Open an account'}
+        </h1>
+        <p className="mt-2 text-[14px] text-inkMuted">Private operations ledger. Restricted access.</p>
 
-        <div className="mt-5 grid grid-cols-2 rounded-md border border-border bg-surfaceAlt p-0.5">
+        <div className="mt-8 flex gap-8 border-b border-bronze/40">
           <button
             type="button"
             onClick={() => setMode('login')}
-            className={`h-8 rounded-[5px] text-[13px] ${mode === 'login' ? 'bg-surface text-ink' : 'text-inkMuted'}`}
+            className={`pb-2 text-[12px] uppercase tracking-[0.14em] ${mode === 'login' ? 'border-b-2 border-ink text-ink' : 'text-inkMuted'}`}
           >
             Log In
           </button>
           <button
             type="button"
             onClick={() => setMode('signup')}
-            className={`h-8 rounded-[5px] text-[13px] ${mode === 'signup' ? 'bg-surface text-ink' : 'text-inkMuted'}`}
+            className={`pb-2 text-[12px] uppercase tracking-[0.14em] ${mode === 'signup' ? 'border-b-2 border-ink text-ink' : 'text-inkMuted'}`}
           >
             Sign Up
           </button>
         </div>
 
-        <form className="mt-5 space-y-3" onSubmit={onSubmit}>
+        <form className="mt-8 space-y-5" onSubmit={onSubmit}>
           {mode === 'signup' ? (
             <Field label="Name">
               <input className={inputCls()} value={name} onChange={(e) => setName(e.target.value)} />
@@ -84,7 +88,7 @@ export function LoginPage() {
             />
           </Field>
           {error ? <p className="text-[13px] text-danger">{error}</p> : null}
-          <Button type="submit" className="w-full" loading={loading}>
+          <Button type="submit" variant="commit" className="w-full" loading={loading}>
             {mode === 'login' ? 'Log In' : 'Create account'}
           </Button>
         </form>
@@ -92,23 +96,23 @@ export function LoginPage() {
         {mode === 'login' ? (
           <button
             type="button"
-            className="mt-3 text-[13px] text-inkMuted hover:text-ink"
+            className="mt-5 text-[13px] text-inkMuted hover:text-ink"
             onClick={() => setError('Contact your administrator to reset a password.')}
           >
             Forgot Password?
           </button>
         ) : (
-          <p className="mt-3 text-[13px] text-inkMuted">
+          <p className="mt-5 text-[13px] text-inkMuted">
             Sign-up creates a customer portal account only. Internal roles are seeded by an administrator.
           </p>
         )}
 
-        <div className="mt-5">
+        <div className="mt-10">
           <InfoBanner>
-            After login, internal users land on the Sales Dashboard. Customers land on their Quotation Portal.
+            After login, internal users land on the ledger. Customers land on their quotation portal.
           </InfoBanner>
         </div>
-        <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkFaint">
+        <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.12em] text-inkFaint">
           Demo: ivan.p@example.net · olivia.t@example.org · marco.r@example.org / password
         </p>
       </div>

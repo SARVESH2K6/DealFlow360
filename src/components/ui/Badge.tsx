@@ -47,7 +47,7 @@ export function Badge({ status, children }: BadgeProps) {
   const text = children ?? labels[key] ?? status.replace(/_/g, ' ')
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.04em] ${cls}`}
+      className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${cls}`}
     >
       {text}
     </span>

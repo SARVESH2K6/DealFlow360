@@ -101,6 +101,7 @@ export function FulfillmentDetailPage() {
 
       <div className="flex gap-2">
         <Button
+          variant="commit"
           loading={action.isPending && action.variables?.action === 'accept-split'}
           onClick={async () => {
             await action.mutateAsync({ action: 'accept-split' })

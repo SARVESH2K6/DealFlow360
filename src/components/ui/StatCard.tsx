@@ -8,20 +8,15 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, value, sublabel, onClick, active, tone = 'default' }: StatCardProps) {
-  const toneBorder =
-    tone === 'ok'
-      ? 'border-ok/30'
-      : tone === 'warn'
-        ? 'border-warn/30'
-        : tone === 'danger'
-          ? 'border-danger/30'
-          : 'border-border'
-  const className = `rounded-md border bg-surface p-4 text-left ${toneBorder} ${onClick ? 'cursor-pointer hover:bg-surfaceAlt' : ''} ${active ? 'bg-surfaceAlt' : ''}`
+  const valueColor =
+    tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : tone === 'danger' ? 'text-danger' : 'text-ink'
+  const className = `bg-surfaceAlt/50 px-5 py-5 text-left ${active ? 'ring-1 ring-bronze/50' : ''} ${onClick ? 'cursor-pointer hover:bg-surfaceAlt' : ''}`
   const body = (
     <>
-      <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">{label}</div>
-      <div className="mt-1 text-[20px] font-medium text-ink">{value}</div>
-      {sublabel ? <div className="mt-1 text-[13px] text-inkMuted">{sublabel}</div> : null}
+      <div className="h-px w-8 bg-bronze" />
+      <div className={`mt-4 font-serif text-[34px] leading-none tracking-tight ${valueColor}`}>{value}</div>
+      <div className="mt-3 text-[10px] font-medium uppercase tracking-[0.16em] text-inkMuted">{label}</div>
+      {sublabel ? <div className="mt-1.5 font-serif text-[15px] tabular-nums text-ink/70">{sublabel}</div> : null}
     </>
   )
   if (onClick) {

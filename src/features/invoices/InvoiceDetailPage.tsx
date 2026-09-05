@@ -58,6 +58,7 @@ export function InvoiceDetailPage() {
       <div className="flex gap-2">
         {canRecordPayment(user?.role) && data.status !== 'paid' ? (
           <Button
+            variant="commit"
             loading={pay.isPending}
             onClick={async () => {
               await pay.mutateAsync()

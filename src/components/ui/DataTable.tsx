@@ -6,6 +6,7 @@ export interface Column<T> {
   header: string
   sortable?: boolean
   className?: string
+  align?: 'left' | 'right'
   render?: (row: T) => ReactNode
   accessor?: (row: T) => string | number
 }
@@ -16,6 +17,7 @@ interface DataTableProps<T> {
   rowKey: (row: T) => string
   onRowClick?: (row: T) => void
   emptyMessage?: string
+  emptyAction?: { label: string; onClick: () => void }
 }
 
 export function DataTable<T>({
@@ -23,7 +25,8 @@ export function DataTable<T>({
   rows,
   rowKey,
   onRowClick,
-  emptyMessage = 'No records',
+  emptyMessage = 'No records in this ledger.',
+  emptyAction,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
@@ -51,19 +54,20 @@ export function DataTable<T>({
   }
 
   if (rows.length === 0) {
-    return <EmptyState message={emptyMessage} />
+    return <EmptyState message={emptyMessage} action={emptyAction} />
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-surface">
+    <div className="w-full">
+      <div className="rule-double mb-1" />
       <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="h-9 bg-surfaceAlt">
+          <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 onClick={() => onHeader(col)}
-                className={`px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted ${col.sortable ? 'cursor-pointer select-none' : ''} ${col.className ?? ''}`}
+                className={`h-11 pr-6 text-[10px] font-medium uppercase tracking-[0.14em] text-inkMuted ${col.sortable ? 'cursor-pointer select-none' : ''} ${col.align === 'right' ? 'text-right' : ''} ${col.className ?? ''}`}
               >
                 {col.header}
                 {sortKey === col.key ? (dir === 'asc' ? ' ↑' : ' ↓') : ''}
@@ -76,10 +80,13 @@ export function DataTable<T>({
             <tr
               key={rowKey(row)}
               onClick={() => onRowClick?.(row)}
-              className={`h-11 border-b border-border last:border-b-0 ${onRowClick ? 'cursor-pointer hover:bg-surfaceAlt' : ''}`}
+              className={`border-b border-ink/[0.08] transition-colors duration-150 last:border-b-0 ${onRowClick ? 'cursor-pointer hover:bg-surfaceAlt/70' : ''}`}
             >
               {columns.map((col) => (
-                <td key={col.key} className={`px-3 text-[14px] text-ink ${col.className ?? ''}`}>
+                <td
+                  key={col.key}
+                  className={`h-14 pr-6 text-[14px] text-ink ${col.align === 'right' ? 'text-right font-serif text-[17px] tabular-nums' : ''} ${col.className ?? ''}`}
+                >
                   {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}
                 </td>
               ))}
@@ -87,6 +94,7 @@ export function DataTable<T>({
           ))}
         </tbody>
       </table>
+      <div className="rule-double mt-1" />
     </div>
   )
 }

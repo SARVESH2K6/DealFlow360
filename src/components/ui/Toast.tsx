@@ -28,18 +28,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex w-80 flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-8 right-10 z-50 flex w-80 flex-col gap-2">
         {items.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto rounded-md border px-3 py-2.5 text-[13px] shadow-sm ${
+            className={`pointer-events-auto border-l-[3px] bg-sheet px-4 py-3 text-[13px] ${
               t.tone === 'ok'
-                ? 'border-ok/30 bg-okBg text-ok'
+                ? 'border-ok bg-okBg text-ok'
                 : t.tone === 'warn'
-                  ? 'border-warn/30 bg-warnBg text-warn'
+                  ? 'border-warn bg-warnBg text-warn'
                   : t.tone === 'danger'
-                    ? 'border-danger/30 bg-dangerBg text-danger'
-                    : 'border-border bg-surface text-ink'
+                    ? 'border-danger bg-dangerBg text-danger'
+                    : 'border-bronze text-ink'
             }`}
           >
             {t.message}

@@ -55,7 +55,7 @@ export function ApprovalsListPage() {
       <PageHeader
         title="Approvals"
         actions={
-          <Button variant={pendingOnly ? 'primary' : 'secondary'} onClick={() => setPendingOnly((v) => !v)}>
+          <Button variant="secondary" onClick={() => setPendingOnly((v) => !v)}>
             Filter: Pending Only
           </Button>
         }

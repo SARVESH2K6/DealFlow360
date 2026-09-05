@@ -151,10 +151,23 @@ export interface ActivityItem {
   timestamp: string
 }
 
+export interface DashboardDeal {
+  id: string
+  number: string
+  customerName: string
+  amount: number
+  status: QuotationStatus
+  riskScore: number
+  riskLevel: RiskLevel
+}
+
 export interface DashboardSummary {
   pendingApprovals: number
   openQuotations: number
   atRiskDeals: number
+  totalDealValue?: number
+  avgDiscount?: number
+  deals?: DashboardDeal[]
   activity: ActivityItem[]
 }
 

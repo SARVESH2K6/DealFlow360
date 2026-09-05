@@ -130,6 +130,7 @@ export function PortalQuotePage() {
           Submit Request
         </Button>
         <Button
+          variant="commit"
           disabled={locked}
           loading={confirm.isPending}
           onClick={async () => {

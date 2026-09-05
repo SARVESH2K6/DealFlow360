@@ -1,20 +1,21 @@
-import { Inbox } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from './Button'
 
 interface EmptyStateProps {
+  title?: string
   message: string
   action?: { label: string; onClick: () => void }
   children?: ReactNode
 }
 
-export function EmptyState({ message, action, children }: EmptyStateProps) {
+export function EmptyState({ title = 'No entries', message, action, children }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-md border border-border bg-surface px-6 py-16 text-center">
-      <Inbox className="h-5 w-5 text-inkFaint" />
-      <p className="mt-3 text-[14px] text-inkMuted">{message}</p>
+    <div className="py-16">
+      <div className="h-px w-12 bg-bronze" />
+      <h2 className="mt-6 font-serif text-[30px] leading-tight text-ink">{title}</h2>
+      <p className="mt-3 max-w-md text-[14px] leading-relaxed text-inkMuted">{message}</p>
       {action ? (
-        <Button className="mt-4" variant="secondary" onClick={action.onClick}>
+        <Button className="mt-8" variant="commit" onClick={action.onClick}>
           {action.label}
         </Button>
       ) : null}

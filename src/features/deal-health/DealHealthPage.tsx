@@ -70,18 +70,18 @@ export function DealHealthPage() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byStage} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke="#E4DDD0" vertical={false} />
-                  <XAxis dataKey="stage" tick={{ fill: '#6B6459', fontSize: 12 }} axisLine={{ stroke: '#D3C9B6' }} />
-                  <YAxis allowDecimals={false} tick={{ fill: '#6B6459', fontSize: 12 }} axisLine={{ stroke: '#D3C9B6' }} />
+                  <CartesianGrid stroke="#E6DCCB" vertical={false} />
+                  <XAxis dataKey="stage" tick={{ fill: '#5E584E', fontSize: 12 }} axisLine={{ stroke: '#B08948' }} />
+                  <YAxis allowDecimals={false} tick={{ fill: '#5E584E', fontSize: 12 }} axisLine={{ stroke: '#B08948' }} />
                   <Tooltip
                     contentStyle={{
-                      background: '#FFFFFF',
-                      border: '1px solid #E4DDD0',
-                      borderRadius: 6,
+                      background: '#FBF6EC',
+                      border: '1px solid #B08948',
+                      borderRadius: 0,
                       fontSize: 13,
                     }}
                   />
-                  <Bar dataKey="count" fill="#9C7A3C" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="count" fill="#B08948" radius={[0, 0, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

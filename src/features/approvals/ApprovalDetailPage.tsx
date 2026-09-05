@@ -139,7 +139,7 @@ export function ApprovalDetailPage() {
             <input className={inputCls()} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Required for the log" />
           </Field>
           <div className="flex gap-2">
-            <Button loading={action.isPending && action.variables?.action === 'approve'} onClick={() => void run('approve')}>
+            <Button variant="commit" loading={action.isPending && action.variables?.action === 'approve'} onClick={() => void run('approve')}>
               Approve
             </Button>
             <Button

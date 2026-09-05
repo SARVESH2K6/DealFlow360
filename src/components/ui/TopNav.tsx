@@ -20,7 +20,7 @@ interface Tab {
 
 function tabsForInternal(role: Role | undefined): Tab[] {
   const tabs: Tab[] = [
-    { to: '/app/dashboard', label: 'Dashboard' },
+    { to: '/app/dashboard', label: 'Portfolio' },
     { to: '/app/quotations', label: 'Quotations' },
   ]
   if (canSeeApprovals(role)) tabs.push({ to: '/app/approvals', label: 'Approvals' })
@@ -50,18 +50,19 @@ export function TopNav({ role }: TopNavProps) {
   const tabs = role === 'portal' ? portalTabs : tabsForInternal(user?.role)
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-surface">
-      <div className="flex h-12 items-center justify-between px-8">
-        <div className="flex items-center gap-8">
-          <span className="text-[15px] font-medium text-ink">DealFlow360</span>
-          <nav className="flex items-center gap-1">
+    <header className="sticky top-0 z-20 bg-sheet">
+      <div className="rule-double" />
+      <div className="flex h-16 items-center justify-between px-10">
+        <div className="flex items-center gap-10">
+          <span className="font-serif text-[20px] tracking-tight text-commit">DealFlow360</span>
+          <nav className="flex items-center gap-7">
             {tabs.map((tab) => (
               <NavLink
                 key={tab.to}
                 to={tab.to}
                 className={({ isActive }) =>
-                  `rounded-md px-2.5 py-1 text-[13px] ${
-                    isActive ? 'bg-surfaceAlt font-medium text-ink' : 'text-inkMuted hover:text-ink'
+                  `text-[12px] uppercase tracking-[0.12em] transition-colors duration-150 ${
+                    isActive ? 'text-ink' : 'text-inkMuted hover:text-ink'
                   }`
                 }
               >
@@ -70,16 +71,16 @@ export function TopNav({ role }: TopNavProps) {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-5">
           <span className="text-[13px] text-inkMuted">
             {user?.name}
-            <span className="ml-2 text-[11px] font-medium uppercase tracking-[0.04em] text-inkFaint">
+            <span className="ml-2 text-[10px] font-medium uppercase tracking-[0.14em] text-inkFaint">
               {user?.role}
             </span>
           </span>
           <button
             type="button"
-            className="text-[13px] text-inkMuted hover:text-ink"
+            className="text-[12px] uppercase tracking-[0.12em] text-inkMuted transition-colors duration-150 hover:text-ink"
             onClick={() => {
               logout()
               navigate('/login')
@@ -89,6 +90,7 @@ export function TopNav({ role }: TopNavProps) {
           </button>
         </div>
       </div>
+      <div className="h-px bg-bronze/40" />
     </header>
   )
 }

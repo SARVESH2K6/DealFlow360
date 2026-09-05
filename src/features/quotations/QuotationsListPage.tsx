@@ -23,7 +23,6 @@ export function QuotationsListPage() {
   const create = useCreateQuotation()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<QuotationStatus | 'all'>('all')
-  const [tableView, setTableView] = useState(false)
 
   const items = data?.items ?? []
   const filtered = useMemo(
@@ -38,9 +37,16 @@ export function QuotationsListPage() {
 
   const columns: Column<QuotationListItem>[] = [
     { key: 'number', header: 'ID', sortable: true, accessor: (r) => r.number },
-    { key: 'customerName', header: 'Client', sortable: true },
+    { key: 'customerName', header: 'Deal Name', sortable: true },
     { key: 'date', header: 'Date', sortable: true, render: (r) => formatDate(r.date) },
-    { key: 'amount', header: 'Amount', sortable: true, accessor: (r) => r.amount, render: (r) => money(r.amount) },
+    {
+      key: 'amount',
+      header: 'Value',
+      sortable: true,
+      align: 'right',
+      accessor: (r) => r.amount,
+      render: (r) => money(r.amount),
+    },
     { key: 'repName', header: 'Rep', sortable: true },
     {
       key: 'status',
@@ -54,14 +60,9 @@ export function QuotationsListPage() {
       <PageHeader
         title="Quotations"
         actions={
-          <>
-            <Button variant="secondary" onClick={() => setTableView((v) => !v)}>
-              {tableView ? 'Switch to Card View' : 'Switch to Table View'}
-            </Button>
-            <Button onClick={() => void newQuote()} loading={create.isPending}>
-              + New Quotation
-            </Button>
-          </>
+          <Button variant="commit" onClick={() => void newQuote()} loading={create.isPending}>
+            New quotation
+          </Button>
         }
       />
 
@@ -69,7 +70,7 @@ export function QuotationsListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
 
       {data ? (
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-5 gap-px bg-bronze/30">
           {FILTERS.map((f) => {
             const subset = items.filter((q) => q.status === f.key)
             const total = subset.reduce((s, q) => s + q.amount, 0)
@@ -89,42 +90,20 @@ export function QuotationsListPage() {
 
       {isLoading ? <TableSkeleton /> : null}
       {data && filtered.length === 0 ? (
-        <EmptyState message="No quotations in this view." action={{ label: '+ New Quotation', onClick: () => void newQuote() }} />
+        <EmptyState
+          title="No quotations"
+          message="No quotations in this view."
+          action={{ label: 'New quotation', onClick: () => void newQuote() }}
+        />
       ) : null}
 
-      {data && filtered.length > 0 && tableView ? (
+      {data && filtered.length > 0 ? (
         <DataTable
           columns={columns}
           rows={filtered}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate(`/app/quotations/${r.id}`)}
         />
-      ) : null}
-
-      {data && filtered.length > 0 && !tableView ? (
-        <div className="grid grid-cols-2 gap-3">
-          {filtered.map((q) => (
-            <button
-              key={q.id}
-              type="button"
-              onClick={() => navigate(`/app/quotations/${q.id}`)}
-              className="flex items-center justify-between rounded-md border border-border bg-surface p-4 text-left hover:bg-surfaceAlt"
-            >
-              <div>
-                <div className="text-[15px] font-medium text-ink">{q.customerName}</div>
-                <div className="mt-0.5 text-[13px] text-inkMuted">
-                  {q.number} · {formatDate(q.date)} · {q.repName}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[15px] font-medium text-ink">{money(q.amount)}</div>
-                <div className="mt-1">
-                  <Badge status={badgeFromStatus(q.status)}>{quotationStatusLabel(q.status)}</Badge>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
       ) : null}
     </Page>
   )

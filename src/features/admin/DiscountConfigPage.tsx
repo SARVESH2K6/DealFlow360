@@ -137,6 +137,7 @@ export function DiscountConfigPage() {
 
       {canEdit ? (
         <Button
+          variant="commit"
           loading={save.isPending}
           onClick={async () => {
             await save.mutateAsync(config)

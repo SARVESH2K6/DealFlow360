@@ -1,20 +1,14 @@
 import type { ReactNode } from 'react'
 
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-surfaceAlt ${className}`} />
+  return <div className={`ledger-shimmer ${className}`} />
 }
 
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-surface">
-      <div className="h-9 bg-surfaceAlt" />
+    <div className="space-y-6 pt-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex h-11 items-center gap-4 border-b border-border px-3 last:border-0">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-40" />
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-3 w-28" />
-        </div>
+        <div key={i} className="ledger-shimmer" />
       ))}
     </div>
   )
@@ -23,37 +17,54 @@ export function TableSkeleton({ rows = 6 }: { rows?: number }) {
 export function StatRowSkeleton() {
   return (
     <div className="grid grid-cols-3 gap-4">
-      <Skeleton className="h-24" />
-      <Skeleton className="h-24" />
-      <Skeleton className="h-24" />
+      <div className="bg-surfaceAlt/50 px-5 py-8">
+        <div className="ledger-shimmer" />
+      </div>
+      <div className="bg-surfaceAlt/50 px-5 py-8">
+        <div className="ledger-shimmer" />
+      </div>
+      <div className="bg-surfaceAlt/50 px-5 py-8">
+        <div className="ledger-shimmer" />
+      </div>
     </div>
   )
 }
 
 interface PageHeaderProps {
   title: string
+  kicker?: string
   actions?: ReactNode
 }
 
-export function PageHeader({ title, actions }: PageHeaderProps) {
+export function PageHeader({ title, kicker, actions }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex items-center justify-between gap-4">
-      <h1 className="text-[20px] font-medium text-ink">{title}</h1>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+    <div className="flex items-end justify-between gap-6">
+      <div>
+        {kicker ? (
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-bronze">{kicker}</p>
+        ) : null}
+        <h1 className="font-serif text-[36px] leading-[1.15] tracking-tight text-ink">{title}</h1>
+      </div>
+      {actions ? <div className="mb-1 flex items-center gap-3">{actions}</div> : null}
     </div>
   )
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  return <div className="space-y-6 px-8 py-8">{children}</div>
+  return <div className="space-y-10">{children}</div>
+}
+
+export function LedgerRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-8 border-b border-ink/[0.08] py-3.5">
+      <span className="text-[13px] text-inkMuted">{label}</span>
+      <div className="text-right font-serif text-[18px] tabular-nums text-ink">{children}</div>
+    </div>
+  )
 }
 
 export function ErrorState({ message }: { message: string }) {
-  return (
-    <div className="rounded-md border border-danger/30 bg-dangerBg px-4 py-3 text-[13px] text-danger">
-      {message}
-    </div>
-  )
+  return <p className="border-l-[3px] border-danger bg-dangerBg/50 px-4 py-2 text-[13px] text-danger">{message}</p>
 }
 
 export function Field({
@@ -65,16 +76,14 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">
-        {label}
-      </span>
+      <span className="mb-2 block text-[10px] font-medium uppercase tracking-[0.14em] text-inkMuted">{label}</span>
       {children}
     </label>
   )
 }
 
 const inputClass =
-  'h-9 w-full rounded-md border border-border bg-surface px-3 text-[14px] text-ink placeholder:text-inkFaint'
+  'h-10 w-full rounded-none border-0 border-b border-bronze/40 bg-transparent px-0 text-[14px] text-ink placeholder:text-inkFaint focus:border-ink focus:outline-none'
 
 export function inputCls(extra = ''): string {
   return `${inputClass} ${extra}`
