@@ -3,11 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { InfoBanner } from '../../components/ui/InfoBanner'
-import { ErrorState, Field, MetaItem, Page, SectionTitle, TableSkeleton, inputCls } from '../../components/ui/Page'
+import { ErrorState, Field, LedgerRow, Page, TableSkeleton, inputCls } from '../../components/ui/Page'
 import { RiskStripe } from '../../components/ui/RiskStripe'
 import { useToast } from '../../components/ui/Toast'
 import { money, moneyExact } from '../../lib/format'
-import { useAuth } from '../../lib/auth'
 import {
   useAddLine,
   useCustomers,
@@ -60,13 +59,13 @@ function DebouncedNumberCell({
   return (
     <span className="inline-flex items-baseline gap-1">
       <input
-        className="h-7 w-14 border-0 border-b border-bronze/50 bg-transparent px-0 text-right font-serif text-[15px] tabular-nums text-ink focus:border-ink focus:outline-none"
+        className="h-8 w-16 border-0 border-b border-bronze/50 bg-transparent px-0 text-right font-serif text-[18px] tabular-nums text-ink focus:border-ink focus:outline-none"
         type="number"
         min={min}
         value={local}
         onChange={(e) => setLocal(e.target.value)}
       />
-      {suffix ? <span className="font-serif text-[15px] text-ink">{suffix}</span> : null}
+      {suffix ? <span className="font-serif text-[18px] text-ink">{suffix}</span> : null}
     </span>
   )
 }
@@ -75,7 +74,6 @@ export function QuotationDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { push } = useToast()
-  const { user } = useAuth()
   const { data, isLoading, isError, error } = useQuotationDetail(id)
   const customers = useCustomers()
   const pricelists = usePricelists()
@@ -101,60 +99,34 @@ export function QuotationDetailPage() {
     )
   }
 
-  const isOwner = Boolean(user && data.repId === user.id)
-  const editable =
-    isOwner && (data.status === 'draft' || data.status === 'returned' || data.status === 'rejected')
+  const editable = ['draft', 'rejected', 'customer_submitted', 'negotiation'].includes(data.status)
 
   async function onSubmit() {
     const result = await submit.mutateAsync()
     push(`Risk score ${result.riskScore} (${result.riskLevel}).`, result.riskLevel === 'HIGH' ? 'warn' : 'ok')
     if (result.approvalRequired) navigate(`/app/approvals/${result.approvalId}`)
-    else navigate('/app/fulfillment')
+    else navigate('/app/quotations')
   }
 
   return (
     <Page>
       <RiskStripe level={data.riskLevel} score={data.riskScore} />
 
-      {data.status === 'returned' && isOwner ? (
-        <InfoBanner tone="warning">
-          Returned for revision. Only you can update this quotation and submit it again.
-        </InfoBanner>
-      ) : null}
-      {data.status === 'draft' && isOwner ? (
-        <InfoBanner>This draft is only visible to you. No one else can complete or submit it.</InfoBanner>
-      ) : null}
-
-      <header className="flex items-end justify-between gap-6">
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-bronze">{data.number}</p>
-          <h1 className="mt-1 font-serif text-[26px] leading-tight tracking-tight text-ink">{data.customerName}</h1>
+      <header className="flex items-end justify-between gap-8">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-bronze">{data.number}</p>
+          <h1 className="mt-2 font-serif text-[36px] leading-tight tracking-tight text-ink">{data.customerName}</h1>
         </div>
-        <div className="flex shrink-0 items-end gap-4">
-          <p className="font-serif text-[26px] leading-none tabular-nums tracking-tight text-ink">{money(data.amount)}</p>
-          {editable ? (
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => navigate('/app/quotations')}>
-                Save draft
-              </Button>
-              <Button
-                variant="commit"
-                disabled={data.lines.length === 0}
-                loading={submit.isPending}
-                onClick={() => void onSubmit()}
-              >
-                {data.status === 'returned' ? 'Resubmit for approval' : 'Submit for approval'}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <p className="font-serif text-[36px] leading-none tabular-nums tracking-tight text-ink">{money(data.amount)}</p>
       </header>
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-        <MetaItem label="Customer">
+      <section>
+        <h2 className="mb-2 font-serif text-[22px] text-ink">Terms</h2>
+        <div className="rule-gold mb-1" />
+        <LedgerRow label="Customer">
           {editable ? (
             <select
-              className={inputCls('w-full font-serif text-[15px]')}
+              className={inputCls('w-56 text-right font-serif text-[18px]')}
               value={data.customerId}
               onChange={(e) => patchHeader.mutate({ customerId: e.target.value })}
             >
@@ -167,11 +139,11 @@ export function QuotationDetailPage() {
           ) : (
             data.customerName
           )}
-        </MetaItem>
-        <MetaItem label="Price list">
+        </LedgerRow>
+        <LedgerRow label="Price list">
           {editable ? (
             <select
-              className={inputCls('w-full font-serif text-[15px]')}
+              className={inputCls('w-56 text-right font-serif text-[18px]')}
               value={data.priceListId}
               onChange={(e) => patchHeader.mutate({ priceListId: e.target.value })}
             >
@@ -184,84 +156,55 @@ export function QuotationDetailPage() {
           ) : (
             data.priceListId
           )}
-        </MetaItem>
-        <MetaItem label="Region">{data.region}</MetaItem>
-        <MetaItem label="Payment terms">{data.terms}</MetaItem>
-      </div>
+        </LedgerRow>
+        <LedgerRow label="Region">{data.region}</LedgerRow>
+        <LedgerRow label="Payment terms">{data.terms}</LedgerRow>
+      </section>
 
       {data.lines.length === 0 ? (
         <EmptyState title="No line items" message="This page is blank. Add a product to post the first entry." />
       ) : (
-        <section>
-          <SectionTitle aside={<span className="text-[11px] uppercase tracking-[0.12em] text-inkMuted">Risk {data.riskScore} · {data.riskLevel}</span>}>
-            Line items
-          </SectionTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-bronze/40">
-                  {['Product', 'Qty', 'Price', 'Discount %', 'Limit', 'Status'].map((h) => (
-                    <th
-                      key={h}
-                      className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.lines.map((line) => (
-                  <tr key={line.id} className="border-b border-ink/[0.08]">
-                    <td className="py-1.5 pr-4 font-serif text-[15px] text-ink">{line.productName}</td>
-                    <td className="py-1.5 pr-4">
-                      {editable ? (
-                        <DebouncedNumberCell
-                          value={line.qty}
-                          min={1}
-                          onCommit={(qty) => patchLine.mutate({ lineId: line.id, qty })}
-                        />
-                      ) : (
-                        <span className="font-serif text-[15px] tabular-nums">{line.qty}</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-4 font-serif text-[15px] tabular-nums">{moneyExact(line.price)}</td>
-                    <td className="py-1.5 pr-4">
-                      {editable ? (
-                        <DebouncedNumberCell
-                          value={line.discountPercent}
-                          min={0}
-                          suffix="%"
-                          onCommit={(discountPercent) => patchLine.mutate({ lineId: line.id, discountPercent })}
-                        />
-                      ) : (
-                        <span className="font-serif text-[15px] tabular-nums">{line.discountPercent}%</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-4 font-serif text-[15px] tabular-nums">{line.limit}%</td>
-                    <td className="py-1.5">
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            line.status === 'within' ? 'bg-ok' : line.status === 'near' ? 'bg-warn' : 'bg-danger'
-                          }`}
-                          aria-hidden
-                        />
-                        <span className={`text-[12px] ${statusTone[line.status]}`}>{statusCopy[line.status]}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <section className="space-y-10">
+          {data.lines.map((line) => (
+            <div key={line.id} className="bg-surfaceAlt/40 px-5 py-4">
+              <h2 className="mb-1 font-serif text-[22px] text-ink">{line.productName}</h2>
+              <LedgerRow label="Quantity">
+                {editable ? (
+                  <DebouncedNumberCell
+                    value={line.qty}
+                    min={1}
+                    onCommit={(qty) => patchLine.mutate({ lineId: line.id, qty })}
+                  />
+                ) : (
+                  line.qty
+                )}
+              </LedgerRow>
+              <LedgerRow label="Unit price">{moneyExact(line.price)}</LedgerRow>
+              <LedgerRow label="Discount">
+                {editable ? (
+                  <DebouncedNumberCell
+                    value={line.discountPercent}
+                    min={0}
+                    suffix="%"
+                    onCommit={(discountPercent) => patchLine.mutate({ lineId: line.id, discountPercent })}
+                  />
+                ) : (
+                  `${line.discountPercent}%`
+                )}
+              </LedgerRow>
+              <LedgerRow label="Limit allowed">{`${line.limit}%`}</LedgerRow>
+              <LedgerRow label="Risk factor">
+                <span className={statusTone[line.status]}>{statusCopy[line.status]}</span>
+              </LedgerRow>
+            </div>
+          ))}
         </section>
       )}
 
       {editable ? (
-        <div className="flex items-end gap-4">
+        <div className="flex items-end gap-8">
           <Field label="Post a product">
-            <select className={inputCls('w-64')} value={productId} onChange={(e) => setProductId(e.target.value)}>
+            <select className={inputCls('w-72')} value={productId} onChange={(e) => setProductId(e.target.value)}>
               <option value="">Select…</option>
               {(products.data?.items ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -285,18 +228,24 @@ export function QuotationDetailPage() {
         </div>
       ) : null}
 
+      <InfoBanner>
+        Discount is checked against each line&apos;s own limit, not just one overall limit for the order.
+      </InfoBanner>
+
       <section>
-        <SectionTitle>Suggested attach</SectionTitle>
-        <div className="grid grid-cols-3 gap-px bg-bronze/30">
+        <h2 className="mb-4 font-serif text-[22px] text-ink">Suggested attach</h2>
+        <div className="divide-y divide-ink/[0.08] border-y border-ink/[0.08]">
           {data.upsells.map((u) => (
-            <div key={u.productId} className="bg-sheet px-4 py-3">
-              <div className="font-serif text-[15px] text-ink">{u.productName}</div>
-              <div className="mt-0.5 text-[12px] text-inkMuted">{u.marginNote}</div>
-              <div className="mt-2 flex items-baseline justify-between gap-3">
+            <div key={u.productId} className="flex items-baseline justify-between gap-6 py-4">
+              <div>
+                <div className="font-serif text-[18px] text-ink">{u.productName}</div>
+                <div className="mt-1 text-[13px] text-inkMuted">{u.marginNote}</div>
+              </div>
+              <div className="flex items-baseline gap-6">
                 <span className="font-serif text-[18px] tabular-nums">{money(u.price)}</span>
                 {editable ? (
                   <Button variant="ghost" onClick={() => addLine.mutate({ productId: u.productId })}>
-                    + Add
+                    Add
                   </Button>
                 ) : null}
               </div>
@@ -304,6 +253,20 @@ export function QuotationDetailPage() {
           ))}
         </div>
       </section>
+
+      <div className="flex justify-end gap-3">
+        <Button variant="secondary" onClick={() => navigate('/app/quotations')}>
+          Save draft
+        </Button>
+        <Button
+          variant="commit"
+          disabled={data.lines.length === 0 || !editable}
+          loading={submit.isPending}
+          onClick={() => void onSubmit()}
+        >
+          Submit Quote
+        </Button>
+      </div>
     </Page>
   )
 }

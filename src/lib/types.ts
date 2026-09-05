@@ -8,11 +8,13 @@ export type QuotationStatus =
   | 'negotiation'
   | 'confirmed'
   | 'rejected'
+  | 'customer_submitted'
+  | 'customer_review'
 
 export type LineRiskStatus = 'within' | 'near' | 'over'
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
 export type ApprovalStatus = 'pending' | 'returned' | 'approved' | 'rejected'
-export type ApprovalStage = 'submitted' | 'sales_manager' | 'finance' | 'confirmed'
+export type ApprovalStage = 'submitted' | 'sales_manager' | 'finance' | 'confirmed' | 'customer_review' | 'negotiation'
 export type BadgeStatus =
   | 'approved'
   | 'pending'

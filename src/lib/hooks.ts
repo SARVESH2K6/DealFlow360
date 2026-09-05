@@ -448,6 +448,17 @@ export function usePortalQuotes() {
   })
 }
 
+export function useCreatePortalQuote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { lines: { productId: string; productName: string; qty: number; price: number; category: string }[] }) =>
+      api<PortalQuote>('/api/portal/quotes', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['portal-quotes'] })
+    },
+  })
+}
+
 export function usePortalQuote(id: string | undefined) {
   return useLiveQuery<PortalQuote>(
     ['portal-quote', id],
