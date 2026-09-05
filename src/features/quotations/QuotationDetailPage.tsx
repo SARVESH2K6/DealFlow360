@@ -7,6 +7,7 @@ import { ErrorState, Field, LedgerRow, Page, TableSkeleton, inputCls } from '../
 import { RiskStripe } from '../../components/ui/RiskStripe'
 import { useToast } from '../../components/ui/Toast'
 import { money, moneyExact } from '../../lib/format'
+import { useAuth } from '../../lib/auth'
 import {
   useAddLine,
   useCustomers,
@@ -74,6 +75,7 @@ export function QuotationDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { push } = useToast()
+  const { user } = useAuth()
   const { data, isLoading, isError, error } = useQuotationDetail(id)
   const customers = useCustomers()
   const pricelists = usePricelists()
@@ -99,7 +101,9 @@ export function QuotationDetailPage() {
     )
   }
 
-  const editable = data.status === 'draft' || data.status === 'rejected'
+  const isOwner = Boolean(user && data.repId === user.id)
+  const editable =
+    isOwner && (data.status === 'draft' || data.status === 'returned' || data.status === 'rejected')
 
   async function onSubmit() {
     const result = await submit.mutateAsync()
@@ -111,6 +115,15 @@ export function QuotationDetailPage() {
   return (
     <Page>
       <RiskStripe level={data.riskLevel} score={data.riskScore} />
+
+      {data.status === 'returned' && isOwner ? (
+        <InfoBanner tone="warning">
+          Returned for revision. Only you can update this quotation and submit it again.
+        </InfoBanner>
+      ) : null}
+      {data.status === 'draft' && isOwner ? (
+        <InfoBanner>This draft is only visible to you. No one else can complete or submit it.</InfoBanner>
+      ) : null}
 
       <header className="flex items-end justify-between gap-8">
         <div>
@@ -254,19 +267,21 @@ export function QuotationDetailPage() {
         </div>
       </section>
 
-      <div className="flex justify-end gap-3">
-        <Button variant="secondary" onClick={() => navigate('/app/quotations')}>
-          Save draft
-        </Button>
-        <Button
-          variant="commit"
-          disabled={data.lines.length === 0 || !editable}
-          loading={submit.isPending}
-          onClick={() => void onSubmit()}
-        >
-          Submit for approval
-        </Button>
-      </div>
+      {editable ? (
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => navigate('/app/quotations')}>
+            Save draft
+          </Button>
+          <Button
+            variant="commit"
+            disabled={data.lines.length === 0}
+            loading={submit.isPending}
+            onClick={() => void onSubmit()}
+          >
+            {data.status === 'returned' ? 'Resubmit for approval' : 'Submit for approval'}
+          </Button>
+        </div>
+      ) : null}
     </Page>
   )
 }

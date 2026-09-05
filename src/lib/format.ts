@@ -51,6 +51,7 @@ export function roleLabel(role: string): string {
 export function quotationStatusLabel(status: string): string {
   const map: Record<string, string> = {
     draft: 'Draft',
+    returned: 'Returned',
     pending_approval: 'Pending Approval',
     approved: 'Approved',
     negotiation: 'Negotiation',
@@ -77,7 +78,9 @@ export function badgeFromStatus(status: string): 'approved' | 'pending' | 'rejec
   if (status === 'approved' || status === 'paid' || status === 'active' || status === 'ready' || status === 'confirmed') {
     return status === 'confirmed' ? 'confirmed' : 'approved'
   }
-  if (status === 'rejected' || status === 'cancelled' || status === 'unpaid') return 'rejected'
+  if (status === 'rejected' || status === 'cancelled' || status === 'unpaid' || status === 'returned') {
+    return 'rejected'
+  }
   if (status === 'draft') return 'draft'
   if (status === 'negotiation' || status === 'under_negotiation' || status === 'paused') return 'negotiating'
   return 'pending'

@@ -2,21 +2,23 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { ErrorState, Page, PageHeader, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, TableSkeleton } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { formatDate, money } from '../../lib/format'
 import { useInvoices } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { Invoice } from '../../lib/types'
 
 export function InvoicesListPage() {
   const { data, isLoading, isError, error } = useInvoices()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<'paid' | 'unpaid' | 'all'>('all')
+  const [query, setQuery] = useState('')
   const items = data?.items ?? []
-  const filtered = useMemo(
-    () => (filter === 'all' ? items : items.filter((i) => i.status === filter)),
-    [items, filter],
-  )
+  const filtered = useMemo(() => {
+    const byStatus = filter === 'all' ? items : items.filter((i) => i.status === filter)
+    return byStatus.filter((i) => matchesSearch(query, [i.number, i.customerName, i.status]))
+  }, [items, filter, query])
 
   const cols: Column<Invoice>[] = [
     { key: 'number', header: 'Invoice #', sortable: true },
@@ -48,6 +50,9 @@ export function InvoicesListPage() {
             />
           ))}
         </div>
+      ) : null}
+      {data ? (
+        <SearchField value={query} onChange={setQuery} placeholder="Search invoices" />
       ) : null}
       {data ? (
         <DataTable

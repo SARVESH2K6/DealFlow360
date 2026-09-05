@@ -6,6 +6,7 @@ import { Server } from 'socket.io'
 import {
   appendAudit,
   approvalDetail,
+  canMutateQuotation,
   computeQuotationRisk,
   db,
   getUpsells,
@@ -13,6 +14,7 @@ import {
   logActivity,
   nextId,
   publicUser,
+  quotationVisibleTo,
   requiredApprovalLevel,
 } from './store.js'
 
@@ -132,15 +134,16 @@ app.get('/api/pricelists', auth, (_req, res) => {
   res.json({ items: db.pricelists })
 })
 
-app.get('/api/dashboard/summary', auth, (_req, res) => {
+app.get('/api/dashboard/summary', auth, (req, res) => {
+  const visible = db.quotations.filter((q) => quotationVisibleTo(q, req.user))
   const pendingApprovals = db.approvals.filter((a) => a.status === 'pending').length
-  const openQuotations = db.quotations.filter((q) =>
-    ['draft', 'pending_approval', 'negotiation'].includes(q.status),
+  const openQuotations = visible.filter((q) =>
+    ['draft', 'returned', 'pending_approval', 'negotiation'].includes(q.status),
   ).length
   const atRiskDeals = db.dealHealth.length
   let valueWeight = 0
   let discountWeight = 0
-  for (const q of db.quotations) {
+  for (const q of visible) {
     computeQuotationRisk(q)
     for (const line of q.lines) {
       const v = line.qty * line.price
@@ -148,7 +151,7 @@ app.get('/api/dashboard/summary', auth, (_req, res) => {
       discountWeight += v * line.discountPercent
     }
   }
-  const totalDealValue = db.quotations.reduce((sum, q) => sum + q.amount, 0)
+  const totalDealValue = visible.reduce((sum, q) => sum + q.amount, 0)
   const avgDiscount = valueWeight === 0 ? 0 : discountWeight / valueWeight
   res.json({
     pendingApprovals,
@@ -156,7 +159,7 @@ app.get('/api/dashboard/summary', auth, (_req, res) => {
     atRiskDeals,
     totalDealValue,
     avgDiscount: Math.round(avgDiscount * 10) / 10,
-    deals: db.quotations.map((q) => ({
+    deals: visible.map((q) => ({
       id: q.id,
       number: q.number,
       customerName: q.customerName,
@@ -170,13 +173,10 @@ app.get('/api/dashboard/summary', auth, (_req, res) => {
 })
 
 app.get('/api/quotations', auth, (req, res) => {
-  if (req.user.role === 'customer') {
-    const items = db.quotations
-      .filter((q) => q.customerId === req.user.customerId)
-      .map(listItem)
-    return res.json({ items })
-  }
-  res.json({ items: db.quotations.map((q) => listItem(computeQuotationRisk(q))) })
+  const items = db.quotations
+    .filter((q) => quotationVisibleTo(q, req.user))
+    .map((q) => listItem(computeQuotationRisk(q)))
+  res.json({ items })
 })
 
 app.post('/api/quotations', auth, requireRoles(['rep', 'manager', 'admin']), (req, res) => {
@@ -206,16 +206,33 @@ app.post('/api/quotations', auth, requireRoles(['rep', 'manager', 'admin']), (re
 app.get('/api/quotations/:id', auth, (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
   if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
-  if (req.user.role === 'customer' && quotation.customerId !== req.user.customerId) {
-    return res.status(403).json({ error: 'Forbidden' })
+  if (!quotationVisibleTo(quotation, req.user)) {
+    return res.status(403).json({ error: 'This draft belongs to another user.' })
   }
   computeQuotationRisk(quotation)
   res.json({ ...quotation, upsells: getUpsells(quotation) })
 })
 
+function refuseUnlessOwner(req, res, quotation) {
+  if (!quotation) {
+    res.status(404).json({ error: 'Quotation not found' })
+    return false
+  }
+  if (!canMutateQuotation(quotation, req.user)) {
+    res.status(403).json({
+      error:
+        quotation.repId === req.user.id
+          ? 'This quotation is locked.'
+          : 'Only the owner can complete this draft.',
+    })
+    return false
+  }
+  return true
+}
+
 app.patch('/api/quotations/:id', auth, (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
+  if (!refuseUnlessOwner(req, res, quotation)) return
   const { customerId, priceListId, region, terms, currency } = req.body || {}
   if (customerId) {
     const customer = db.customers.find((c) => c.id === customerId)
@@ -234,7 +251,7 @@ app.patch('/api/quotations/:id', auth, (req, res) => {
 
 app.post('/api/quotations/:id/lines', auth, (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
+  if (!refuseUnlessOwner(req, res, quotation)) return
   const product = db.products.find((p) => p.id === req.body?.productId)
   if (!product) return res.status(400).json({ error: 'Unknown product' })
   quotation.lines.push({
@@ -253,7 +270,7 @@ app.post('/api/quotations/:id/lines', auth, (req, res) => {
 
 app.patch('/api/quotations/:id/lines/:lineId', auth, (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
+  if (!refuseUnlessOwner(req, res, quotation)) return
   const line = quotation.lines.find((l) => l.id === req.params.lineId)
   if (!line) return res.status(404).json({ error: 'Line not found' })
   if (req.body?.discountPercent !== undefined) {
@@ -267,7 +284,7 @@ app.patch('/api/quotations/:id/lines/:lineId', auth, (req, res) => {
 
 app.delete('/api/quotations/:id/lines/:lineId', auth, (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
+  if (!refuseUnlessOwner(req, res, quotation)) return
   quotation.lines = quotation.lines.filter((l) => l.id !== req.params.lineId)
   computeQuotationRisk(quotation)
   res.json({ ...quotation, upsells: getUpsells(quotation) })
@@ -275,7 +292,7 @@ app.delete('/api/quotations/:id/lines/:lineId', auth, (req, res) => {
 
 app.post('/api/quotations/:id/submit', auth, (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' })
+  if (!refuseUnlessOwner(req, res, quotation)) return
   if (quotation.lines.length === 0) {
     return res.status(400).json({ error: 'Cannot submit an empty quotation' })
   }
@@ -452,7 +469,7 @@ app.post('/api/approvals/:id/return', auth, (req, res) => {
   approval.status = 'returned'
   approval.stage = 'submitted'
   approval.assignedTo = quotation.repName
-  quotation.status = 'draft'
+  quotation.status = 'returned'
   appendAudit(approval, req.user, 'Returned', note)
   logActivity(`${quotation.number} returned for revision by ${req.user.name}`)
   const detail = approvalDetail(approval)
@@ -738,14 +755,19 @@ app.post('/api/discount-config', auth, requireRoles(['admin']), (req, res) => {
 
 app.get('/api/portal/quotes', auth, requireRoles(['customer']), (req, res) => {
   const items = db.quotations
-    .filter((q) => q.customerId === req.user.customerId && q.status !== 'draft')
+    .filter((q) => q.customerId === req.user.customerId && q.status !== 'draft' && q.status !== 'returned')
     .map(listItem)
   res.json({ items })
 })
 
 app.get('/api/portal/quote/:id', auth, requireRoles(['customer']), (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
-  if (!quotation || quotation.customerId !== req.user.customerId) {
+  if (
+    !quotation ||
+    quotation.customerId !== req.user.customerId ||
+    quotation.status === 'draft' ||
+    quotation.status === 'returned'
+  ) {
     return res.status(404).json({ error: 'Quotation not found' })
   }
   computeQuotationRisk(quotation)

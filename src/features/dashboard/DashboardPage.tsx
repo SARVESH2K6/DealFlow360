@@ -1,12 +1,14 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { ErrorState, Page, PageHeader, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
 import { canSeeApprovals, useAuth } from '../../lib/auth'
 import { formatDateTime, money, quotationStatusLabel } from '../../lib/format'
 import { useCreateQuotation, useDashboard } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { DashboardDeal } from '../../lib/types'
 
 export function DashboardPage() {
@@ -15,6 +17,11 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const create = useCreateQuotation()
   const deals = data?.deals ?? []
+  const [query, setQuery] = useState('')
+  const visibleDeals = useMemo(
+    () => deals.filter((d) => matchesSearch(query, [d.customerName, d.number, quotationStatusLabel(d.status)])),
+    [deals, query],
+  )
 
   async function newQuote() {
     const created = await create.mutateAsync({})
@@ -93,18 +100,19 @@ export function DashboardPage() {
       <section>
         <h2 className="mb-1 font-serif text-[22px] text-ink">Holdings</h2>
         <p className="mb-5 text-[13px] text-inkMuted">Open and settled deals across the book.</p>
+        <SearchField value={query} onChange={setQuery} placeholder="Search holdings" />
         {isLoading ? <TableSkeleton /> : null}
-        {data && deals.length === 0 ? (
+        {data && visibleDeals.length === 0 ? (
           <EmptyState
             title="A blank statement"
-            message="No deals have been posted. Open a quotation to begin the book."
+            message={query ? 'No holdings match that search.' : 'No deals have been posted. Open a quotation to begin the book.'}
             action={{ label: 'New quotation', onClick: () => void newQuote() }}
           />
         ) : null}
-        {deals.length > 0 ? (
+        {visibleDeals.length > 0 ? (
           <DataTable
             columns={columns}
-            rows={deals}
+            rows={visibleDeals}
             rowKey={(r) => r.id}
             onRowClick={(r) => navigate(`/app/quotations/${r.id}`)}
           />

@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { ErrorState, Field, Page, PageHeader, TableSkeleton, inputCls } from '../../components/ui/Page'
+import { ErrorState, Field, Page, PageHeader, SearchField, TableSkeleton, inputCls } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { useAuth } from '../../lib/auth'
 import { formatDate } from '../../lib/format'
 import { api } from '../../lib/api'
 import { useSubscriptions } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { Subscription } from '../../lib/types'
 
 export function SubscriptionsListPage() {
@@ -18,12 +19,13 @@ export function SubscriptionsListPage() {
   const [filter, setFilter] = useState<'active' | 'paused' | 'cancelled' | 'all'>('all')
   const [creating, setCreating] = useState(false)
   const [plan, setPlan] = useState('Custom Plan')
+  const [query, setQuery] = useState('')
 
   const items = data?.items ?? []
-  const filtered = useMemo(
-    () => (filter === 'all' ? items : items.filter((s) => s.status === filter)),
-    [items, filter],
-  )
+  const filtered = useMemo(() => {
+    const byStatus = filter === 'all' ? items : items.filter((s) => s.status === filter)
+    return byStatus.filter((s) => matchesSearch(query, [s.customerName, s.plan, s.cycle, s.status]))
+  }, [items, filter, query])
 
   const cols: Column<Subscription>[] = [
     { key: 'customerName', header: 'Customer', sortable: true },
@@ -82,6 +84,9 @@ export function SubscriptionsListPage() {
             Create
           </Button>
         </div>
+      ) : null}
+      {data ? (
+        <SearchField value={query} onChange={setQuery} placeholder="Search subscriptions" />
       ) : null}
       {data ? (
         <DataTable

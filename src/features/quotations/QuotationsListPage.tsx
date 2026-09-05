@@ -4,14 +4,16 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { ErrorState, Page, PageHeader, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { badgeFromStatus, formatDate, money, quotationStatusLabel } from '../../lib/format'
 import { useCreateQuotation, useQuotations } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { QuotationListItem, QuotationStatus } from '../../lib/types'
 
 const FILTERS: { key: QuotationStatus | 'all'; label: string }[] = [
   { key: 'draft', label: 'Draft' },
+  { key: 'returned', label: 'Returned' },
   { key: 'pending_approval', label: 'Pending Approval' },
   { key: 'approved', label: 'Approved' },
   { key: 'negotiation', label: 'Negotiation' },
@@ -23,12 +25,15 @@ export function QuotationsListPage() {
   const create = useCreateQuotation()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<QuotationStatus | 'all'>('all')
+  const [query, setQuery] = useState('')
 
   const items = data?.items ?? []
-  const filtered = useMemo(
-    () => (filter === 'all' ? items : items.filter((q) => q.status === filter)),
-    [items, filter],
-  )
+  const filtered = useMemo(() => {
+    const byStatus = filter === 'all' ? items : items.filter((q) => q.status === filter)
+    return byStatus.filter((q) =>
+      matchesSearch(query, [q.number, q.customerName, q.repName, quotationStatusLabel(q.status)]),
+    )
+  }, [items, filter, query])
 
   async function newQuote() {
     const created = await create.mutateAsync({})
@@ -47,7 +52,7 @@ export function QuotationsListPage() {
       accessor: (r) => r.amount,
       render: (r) => money(r.amount),
     },
-    { key: 'repName', header: 'Rep', sortable: true },
+    { key: 'repName', header: 'Owner', sortable: true },
     {
       key: 'status',
       header: 'Status',
@@ -70,7 +75,7 @@ export function QuotationsListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
 
       {data ? (
-        <div className="grid grid-cols-5 gap-px bg-bronze/30">
+        <div className="grid grid-cols-6 gap-px bg-bronze/30">
           {FILTERS.map((f) => {
             const subset = items.filter((q) => q.status === f.key)
             const total = subset.reduce((s, q) => s + q.amount, 0)
@@ -81,6 +86,7 @@ export function QuotationsListPage() {
                 value={subset.length}
                 sublabel={money(total)}
                 active={filter === f.key}
+                tone={f.key === 'returned' ? 'danger' : undefined}
                 onClick={() => setFilter((cur) => (cur === f.key ? 'all' : f.key))}
               />
             )
@@ -89,10 +95,13 @@ export function QuotationsListPage() {
       ) : null}
 
       {isLoading ? <TableSkeleton /> : null}
+      {data ? (
+        <SearchField value={query} onChange={setQuery} placeholder="Search quotations" />
+      ) : null}
       {data && filtered.length === 0 ? (
         <EmptyState
           title="No quotations"
-          message="No quotations in this view."
+          message={query ? 'No quotations match that search.' : 'No quotations in this view.'}
           action={{ label: 'New quotation', onClick: () => void newQuote() }}
         />
       ) : null}

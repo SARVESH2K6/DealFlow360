@@ -1,17 +1,24 @@
+import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { ErrorState, Page, PageHeader, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { useToast } from '../../components/ui/Toast'
 import { formatDate } from '../../lib/format'
 import { useDealHealth, useDealHealthAction } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { DealHealthItem } from '../../lib/types'
 
 export function DealHealthPage() {
   const { data, isLoading, isError, error } = useDealHealth()
   const action = useDealHealthAction()
   const { push } = useToast()
+  const [query, setQuery] = useState('')
+  const rows = useMemo(
+    () => (data?.items ?? []).filter((r) => matchesSearch(query, [r.deal, r.issue, r.type])),
+    [data?.items, query],
+  )
 
   const cols: Column<DealHealthItem>[] = [
     { key: 'deal', header: 'Deal', sortable: true },
@@ -64,7 +71,8 @@ export function DealHealthPage() {
             <StatCard label="Discount Anomalies" value={data.anomalies} tone="danger" />
             <StatCard label="Delivery Slippage" value={data.slippage} />
           </div>
-          <DataTable columns={cols} rows={data.items} rowKey={(r) => r.id} emptyMessage="No flagged deals." />
+          <SearchField value={query} onChange={setQuery} placeholder="Search flagged deals" />
+          <DataTable columns={cols} rows={rows} rowKey={(r) => r.id} emptyMessage="No flagged deals." />
           <section className="rounded-md border border-border bg-surface p-4">
             <h2 className="mb-4 text-[15px] font-medium text-ink">Deals by stage</h2>
             <div className="h-64">

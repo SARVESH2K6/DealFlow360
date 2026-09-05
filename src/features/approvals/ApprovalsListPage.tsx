@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { ErrorState, Page, PageHeader, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, TableSkeleton } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { quotationStatusLabel } from '../../lib/format'
 import { useApprovals } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { ApprovalListItem, ApprovalStatus } from '../../lib/types'
 
 function riskBadge(level: string) {
@@ -18,14 +19,17 @@ export function ApprovalsListPage() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<ApprovalStatus | 'all'>('all')
   const [pendingOnly, setPendingOnly] = useState(false)
+  const [query, setQuery] = useState('')
 
   const items = data?.items ?? []
   const filtered = useMemo(() => {
     let rows = items
     if (pendingOnly) rows = rows.filter((r) => r.status === 'pending')
     else if (filter !== 'all') rows = rows.filter((r) => r.status === filter)
-    return rows
-  }, [items, filter, pendingOnly])
+    return rows.filter((r) =>
+      matchesSearch(query, [r.quotationNumber, r.customerName, r.assignedTo, r.riskLevel, quotationStatusLabel(r.stage)]),
+    )
+  }, [items, filter, pendingOnly, query])
 
   const columns: Column<ApprovalListItem>[] = [
     { key: 'quotationNumber', header: 'Quotation', sortable: true },
@@ -81,6 +85,9 @@ export function ApprovalsListPage() {
             )
           })}
         </div>
+      ) : null}
+      {data ? (
+        <SearchField value={query} onChange={setQuery} placeholder="Search approvals" />
       ) : null}
       {data ? (
         <DataTable

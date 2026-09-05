@@ -88,3 +88,37 @@ const inputClass =
 export function inputCls(extra = ''): string {
   return `${inputClass} ${extra}`
 }
+
+export function SearchField({
+  value,
+  onChange,
+  placeholder = 'Search',
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div className="relative">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-bronze"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      >
+        <circle cx="6.5" cy="6.5" r="4.25" />
+        <path d="M9.6 9.6 14 14" />
+      </svg>
+      <input
+        className="h-10 w-full rounded-none border-0 border-b border-bronze/40 bg-transparent py-0 pl-7 pr-0 text-[14px] text-ink placeholder:text-inkFaint focus:border-ink focus:outline-none"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={placeholder}
+      />
+    </div>
+  )
+}

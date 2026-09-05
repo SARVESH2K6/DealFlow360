@@ -585,9 +585,86 @@ function seed() {
     ],
   })
 
-  db.quotations = [q1042, q1043, q1044, q1045, q1046, q1047, q1048]
+  const q1049 = computeQuotationRisk({
+    id: 'q-1049',
+    number: 'Q-1049',
+    customerId: 'c-initech',
+    date: iso(3, 10),
+    repId: 'u-rep',
+    repName: 'Alex Rivera',
+    status: 'returned',
+    currency: 'USD',
+    region: 'North America',
+    terms: 'Net 15',
+    priceListId: 'pl-usd',
+    lines: [
+      {
+        id: 'l-1049-1',
+        productId: 'p-sensor',
+        productName: 'Industrial Sensor Array',
+        category: 'Hardware',
+        qty: 3,
+        price: 12500,
+        discountPercent: 16,
+        comment: '',
+      },
+    ],
+  })
+
+  const q1050 = computeQuotationRisk({
+    id: 'q-1050',
+    number: 'Q-1050',
+    customerId: 'c-umbrella',
+    date: iso(0, 15),
+    repId: 'u-mgr',
+    repName: 'Jordan Chen',
+    status: 'draft',
+    currency: 'USD',
+    region: 'APAC',
+    terms: 'Net 30',
+    priceListId: 'pl-usd',
+    lines: [
+      {
+        id: 'l-1050-1',
+        productId: 'p-support',
+        productName: '24/7 Support Retainer',
+        category: 'Services',
+        qty: 1,
+        price: 18000,
+        discountPercent: 8,
+        comment: '',
+      },
+    ],
+  })
+
+  db.quotations = [q1042, q1043, q1044, q1045, q1046, q1047, q1048, q1049, q1050]
 
   db.approvals = [
+    {
+      id: 'a-1049',
+      quotationId: 'q-1049',
+      status: 'returned',
+      stage: 'submitted',
+      assignedTo: 'Alex Rivera',
+      assignedRole: 'rep',
+      daysPending: 0,
+      auditLog: [
+        {
+          user: 'Alex Rivera',
+          userId: 'u-rep',
+          action: 'Submitted',
+          date: iso(3, 10),
+          note: 'Requested extra hardware discount for Initech.',
+        },
+        {
+          user: 'Jordan Chen',
+          userId: 'u-mgr',
+          action: 'Returned',
+          date: iso(2, 15),
+          note: 'Discount is too high for Bronze. Revise and resubmit.',
+        },
+      ],
+    },
     {
       id: 'a-1042',
       quotationId: 'q-1042',
@@ -988,6 +1065,7 @@ export function listItem(q) {
     customerName: q.customerName,
     date: q.date,
     amount: q.amount,
+    repId: q.repId,
     repName: q.repName,
     status: q.status,
     riskLevel: q.riskLevel,
@@ -995,6 +1073,23 @@ export function listItem(q) {
     blendedRisk: q.blendedRisk,
     customerTier: q.customerTier,
   }
+}
+
+export function isOwnerOnlyStatus(status) {
+  return status === 'draft' || status === 'returned'
+}
+
+export function quotationVisibleTo(q, user) {
+  if (!user) return false
+  if (user.role === 'customer') return q.customerId === user.customerId
+  if (isOwnerOnlyStatus(q.status)) return q.repId === user.id
+  return true
+}
+
+export function canMutateQuotation(q, user) {
+  if (!user) return false
+  if (!['draft', 'returned', 'rejected'].includes(q.status)) return false
+  return q.repId === user.id
 }
 
 export function approvalDetail(approval) {

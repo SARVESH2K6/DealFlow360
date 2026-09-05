@@ -2,6 +2,7 @@ export type Role = 'rep' | 'manager' | 'finance' | 'admin' | 'customer'
 
 export type QuotationStatus =
   | 'draft'
+  | 'returned'
   | 'pending_approval'
   | 'approved'
   | 'negotiation'
@@ -32,6 +33,7 @@ export type BadgeStatus =
   | 'unpaid'
   | 'sent'
   | 'under_negotiation'
+  | 'returned'
 
 export interface User {
   id: string
@@ -124,6 +126,7 @@ export interface QuotationListItem {
   customerName: string
   date: string
   amount: number
+  repId: string
   repName: string
   status: QuotationStatus
   riskLevel: RiskLevel

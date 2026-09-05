@@ -1,14 +1,25 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { ErrorState, Page, PageHeader, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, TableSkeleton } from '../../components/ui/Page'
 import { badgeFromStatus, formatDate, money, quotationStatusLabel } from '../../lib/format'
 import { usePortalQuotes } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { QuotationListItem } from '../../lib/types'
 
 export function PortalQuotesListPage() {
   const { data, isLoading, isError, error } = usePortalQuotes()
   const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+
+  const rows = useMemo(
+    () =>
+      (data?.items ?? []).filter((q) =>
+        matchesSearch(query, [q.number, q.customerName, quotationStatusLabel(q.status)]),
+      ),
+    [data?.items, query],
+  )
 
   const cols: Column<QuotationListItem>[] = [
     { key: 'number', header: 'Quotation' },
@@ -27,13 +38,16 @@ export function PortalQuotesListPage() {
       {isLoading ? <TableSkeleton /> : null}
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
-        <DataTable
-          columns={cols}
-          rows={data.items}
-          rowKey={(r) => r.id}
-          onRowClick={(r) => navigate(`/portal/quote/${r.id}`)}
-          emptyMessage="No quotations have been shared with you yet."
-        />
+        <>
+          <SearchField value={query} onChange={setQuery} placeholder="Search quotations" />
+          <DataTable
+            columns={cols}
+            rows={rows}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => navigate(`/portal/quote/${r.id}`)}
+            emptyMessage="No quotations have been shared with you yet."
+          />
+        </>
       ) : null}
     </Page>
   )
