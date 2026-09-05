@@ -12,10 +12,8 @@ import type { QuotationListItem, QuotationStatus } from '../../lib/types'
 
 const FILTERS: { key: QuotationStatus | 'all'; label: string }[] = [
   { key: 'draft', label: 'Draft' },
-  { key: 'customer_submitted', label: 'Portal Requests' },
   { key: 'pending_approval', label: 'Pending Approval' },
   { key: 'approved', label: 'Approved' },
-  { key: 'customer_review', label: 'Customer Review' },
   { key: 'negotiation', label: 'Negotiation' },
   { key: 'confirmed', label: 'Confirmed' },
 ]

@@ -70,8 +70,6 @@ export function quotationStatusLabel(status: string): string {
     sales_manager: 'Sales Manager',
     finance: 'Finance',
     submitted: 'Submitted',
-    customer_submitted: 'Customer Submitted',
-    customer_review: 'Customer Review',
   }
   return map[status] ?? status
 }
@@ -84,6 +82,6 @@ export function badgeFromStatus(status: string): 'approved' | 'pending' | 'rejec
     return 'rejected'
   }
   if (status === 'draft') return 'draft'
-  if (status === 'negotiation' || status === 'under_negotiation' || status === 'paused' || status === 'customer_review') return 'negotiating'
+  if (status === 'negotiation' || status === 'under_negotiation' || status === 'paused') return 'negotiating'
   return 'pending'
 }

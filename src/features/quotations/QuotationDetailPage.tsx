@@ -99,7 +99,7 @@ export function QuotationDetailPage() {
     )
   }
 
-  const editable = ['draft', 'rejected', 'customer_submitted', 'negotiation'].includes(data.status)
+  const editable = ['draft', 'rejected', 'negotiation'].includes(data.status)
 
   async function onSubmit() {
     const result = await submit.mutateAsync()

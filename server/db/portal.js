@@ -152,7 +152,7 @@ export async function createPortalQuote(user, lines) {
   const id = nextId('q')
   await query(
     `INSERT INTO quotations (id, number, customer_id, customer_name, customer_tier, date, rep_id, rep_name, status, portal_status, currency, region, terms, price_list_id, amount, risk_score, risk_level, blended_risk)
-     VALUES ($1, $2, $3, $4, $5, $6, NULL, 'Unassigned', 'customer_submitted', 'submitted', 'USD', $7, $8, 'pl-usd', 0, 0, 'LOW', 0)`,
+     VALUES ($1, $2, $3, $4, $5, $6, NULL, 'Unassigned', 'draft', 'submitted', 'USD', $7, $8, 'pl-usd', 0, 0, 'LOW', 0)`,
     [id, `Q-${seq}`, c.id, c.name, c.tier, new Date().toISOString(), c.region, c.terms],
   )
 

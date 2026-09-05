@@ -220,23 +220,32 @@ app.post('/api/quotations/:id/submit', auth, wrap(async (req, res) => {
   const level = requiredApprovalLevel(q.riskLevel)
   let approvalId
   
-  // Calculate total qty and check 70% rule
-  let totalQty = 0;
-  q.lines.forEach(l => totalQty += Number(l.qty));
-  const requiresFinance = q.lines.some(l => totalQty > 0 && (Number(l.qty) / totalQty) > 0.70);
+  // Check 70% rule: does any line item's qty exceed 70% of that product's total warehouse stock?
+  let requiresFinance = false;
+  for (const l of q.lines) {
+    const { rows: stockRows } = await query(
+      'SELECT COALESCE(SUM(in_stock), 0)::int AS total_stock FROM stock WHERE product_id = $1',
+      [l.productId]
+    );
+    const totalStock = stockRows[0]?.total_stock || 0;
+    if (totalStock > 0 && (Number(l.qty) / totalStock) > 0.70) {
+      requiresFinance = true;
+      break;
+    }
+  }
 
   if (level === 'none' && !requiresFinance) {
     // Both filters pass: Goes to customer directly
-    await query("UPDATE quotations SET status = 'customer_review', portal_status = 'sent' WHERE id = $1", [q.id])
+    await query("UPDATE quotations SET status = 'approved', portal_status = 'sent' WHERE id = $1", [q.id])
     
     // Auto-approve the internal steps
     const { rows: existingA } = await query('SELECT id FROM approvals WHERE quotation_id = $1', [q.id])
     if (existingA.length > 0) {
       approvalId = existingA[0].id
-      await query("UPDATE approvals SET status = 'approved', stage = 'customer_review', assigned_to = '—', assigned_role = 'none' WHERE id = $1", [approvalId])
+      await query("UPDATE approvals SET status = 'approved', stage = 'confirmed', assigned_to = '—', assigned_role = 'none' WHERE id = $1", [approvalId])
     } else {
       approvalId = nextId('a')
-      await query(`INSERT INTO approvals (id, quotation_id, status, stage, assigned_to, assigned_role, days_pending) VALUES ($1, $2, 'approved', 'customer_review', '—', 'none', 0)`, [approvalId, q.id])
+      await query(`INSERT INTO approvals (id, quotation_id, status, stage, assigned_to, assigned_role, days_pending) VALUES ($1, $2, 'approved', 'confirmed', '—', 'none', 0)`, [approvalId, q.id])
     }
 
     await query(`INSERT INTO approval_audit_log (approval_id, user_name, user_id, action, date, note) VALUES ($1, $2, $3, 'Submitted', $4, 'Within policy and quantity limits. Sent to customer.')`, [approvalId, req.user.name, req.user.id, new Date().toISOString()])

@@ -119,18 +119,28 @@ export async function approveApproval(id, user, note) {
   const q = qRows[0]
   const noteText = note || 'Approved.'
 
-  const { rows: lineRows } = await query('SELECT qty FROM quotation_lines WHERE quotation_id = $1', [q.id])
-  let totalQty = 0;
-  lineRows.forEach(l => totalQty += Number(l.qty));
-  const requiresFinance = lineRows.some(l => totalQty > 0 && (Number(l.qty) / totalQty) > 0.70);
+  // Check 70% rule: does any line item's qty exceed 70% of that product's total warehouse stock?
+  const { rows: lineRows } = await query('SELECT product_id, qty FROM quotation_lines WHERE quotation_id = $1', [q.id])
+  let requiresFinance = false;
+  for (const l of lineRows) {
+    const { rows: stockRows } = await query(
+      'SELECT COALESCE(SUM(in_stock), 0)::int AS total_stock FROM stock WHERE product_id = $1',
+      [l.product_id]
+    );
+    const totalStock = stockRows[0]?.total_stock || 0;
+    if (totalStock > 0 && (Number(l.qty) / totalStock) > 0.70) {
+      requiresFinance = true;
+      break;
+    }
+  }
 
   if (a.stage === 'sales_manager' && (q.risk_level === 'HIGH' || requiresFinance)) {
     await query("UPDATE approvals SET stage = 'finance', assigned_to = 'Sam Patel', assigned_role = 'finance', status = 'pending' WHERE id = $1", [id])
     await appendAuditDb(id, user, 'Approved', `${noteText} Routed to Finance.`)
   } else {
     // Both approved (or Finance just approved). Route to Customer.
-    await query("UPDATE approvals SET stage = 'customer_review', status = 'approved', assigned_to = '—' WHERE id = $1", [id])
-    await query("UPDATE quotations SET status = 'customer_review', portal_status = 'sent' WHERE id = $1", [a.quotation_id])
+    await query("UPDATE approvals SET stage = 'confirmed', status = 'approved', assigned_to = '—' WHERE id = $1", [id])
+    await query("UPDATE quotations SET status = 'approved', portal_status = 'sent' WHERE id = $1", [a.quotation_id])
     await appendAuditDb(id, user, 'Approved', `${noteText} Internal approval complete. Sent to customer.`)
   }
 

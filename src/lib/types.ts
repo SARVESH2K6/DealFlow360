@@ -2,19 +2,16 @@ export type Role = 'rep' | 'manager' | 'finance' | 'admin' | 'customer'
 
 export type QuotationStatus =
   | 'draft'
-  | 'returned'
   | 'pending_approval'
   | 'approved'
   | 'negotiation'
   | 'confirmed'
   | 'rejected'
-  | 'customer_submitted'
-  | 'customer_review'
 
 export type LineRiskStatus = 'within' | 'near' | 'over'
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
 export type ApprovalStatus = 'pending' | 'returned' | 'approved' | 'rejected'
-export type ApprovalStage = 'submitted' | 'sales_manager' | 'finance' | 'confirmed' | 'customer_review' | 'negotiation'
+export type ApprovalStage = 'submitted' | 'sales_manager' | 'finance' | 'confirmed' | 'negotiation'
 export type BadgeStatus =
   | 'approved'
   | 'pending'
