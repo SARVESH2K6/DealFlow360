@@ -60,45 +60,62 @@ export function FulfillmentDetailPage() {
         actions={<Badge status={view.status}>{quotationStatusLabel(view.status)}</Badge>}
       />
 
+      {view.canConsolidate ? (
+        <div className="flex items-center justify-between gap-6 border-l-[3px] border-warn bg-warnBg/40 px-4 py-3">
+          <p className="text-[13px] leading-relaxed text-warn">
+            Stock has arrived. Consolidate remaining backorder
+            {view.remainingQty ? ` (${view.remainingQty} units)` : ''}?
+          </p>
+          <Button
+            variant="commit"
+            loading={action.isPending && action.variables?.action === 'consolidate'}
+            onClick={async () => {
+              await action.mutateAsync({ action: 'consolidate' })
+              push('Remaining backorder consolidated.', 'ok')
+            }}
+          >
+            Consolidate Remaining Backorder
+          </Button>
+        </div>
+      ) : null}
+
       {view.lines.map((line, lineIdx) => (
         <section key={line.productId}>
-          <h2 className="mb-3 text-[15px] font-medium text-ink">
+          <h2 className="mb-2 font-serif text-[18px] text-ink">
             {line.productName} <span className="text-inkMuted">· qty {line.qty}</span>
           </h2>
-          <div className="overflow-hidden rounded-md border border-border bg-surface">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="h-9 bg-surfaceAlt">
-                  {['Warehouse', 'Qty Fulfilled', 'Est. Shipments', 'Cost'].map((h) => (
-                    <th key={h} className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {line.suggested.map((row, rowIdx) => (
-                  <tr key={row.warehouse} className="h-11 border-b border-border last:border-0">
-                    <td className="px-3">{row.warehouse}</td>
-                    <td className="px-3">
-                      {canSplit && editing ? (
-                        <input
-                          className={inputCls('w-24')}
-                          type="number"
-                          value={row.qtyFulfilled}
-                          onChange={(e) => updateQty(lineIdx, rowIdx, Number(e.target.value))}
-                        />
-                      ) : (
-                        row.qtyFulfilled
-                      )}
-                    </td>
-                    <td className="px-3">{row.estShipments}</td>
-                    <td className="px-3">{row.cost}</td>
-                  </tr>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-bronze/40">
+                {['Warehouse', 'Qty Fulfilled', 'Est. Shipments', 'Cost'].map((h) => (
+                  <th key={h} className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">
+                    {h}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
+            <tbody>
+              {line.suggested.map((row, rowIdx) => (
+                <tr key={row.warehouse} className="h-9 border-b border-ink/[0.08] last:border-0">
+                  <td className="pr-4 text-[13px]">{row.warehouse}</td>
+                  <td className="pr-4">
+                    {canSplit && editing ? (
+                      <input
+                        className={inputCls('w-20')}
+                        type="number"
+                        value={row.qtyFulfilled}
+                        onChange={(e) => updateQty(lineIdx, rowIdx, Number(e.target.value))}
+                      />
+                    ) : (
+                      <span className="font-serif text-[15px] tabular-nums">{row.qtyFulfilled}</span>
+                    )}
+                  </td>
+                  <td className="pr-4 font-serif text-[15px] tabular-nums">{row.estShipments}</td>
+                  <td className="font-serif text-[15px] tabular-nums">{row.cost}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       ))}
 

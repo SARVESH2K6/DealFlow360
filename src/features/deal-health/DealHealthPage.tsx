@@ -66,18 +66,21 @@ export function DealHealthPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-px bg-bronze/30">
             <StatCard label="Stalled Deals" value={data.stalled} tone="warn" />
             <StatCard label="Discount Anomalies" value={data.anomalies} tone="danger" />
             <StatCard label="Delivery Slippage" value={data.slippage} />
           </div>
           <SearchField value={query} onChange={setQuery} placeholder="Search flagged deals" />
-          <DataTable columns={cols} rows={rows} rowKey={(r) => r.id} emptyMessage="No flagged deals." />
-          <section className="rounded-md border border-border bg-surface p-4">
-            <h2 className="mb-4 text-[15px] font-medium text-ink">Deals by stage</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.byStage} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div>
+              <DataTable columns={cols} rows={rows} rowKey={(r) => r.id} emptyMessage="No flagged deals." />
+            </div>
+            <section>
+              <h2 className="mb-2 font-serif text-[18px] text-ink">Deals by stage</h2>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.byStage} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="#E6DCCB" vertical={false} />
                   <XAxis dataKey="stage" tick={{ fill: '#5E584E', fontSize: 12 }} axisLine={{ stroke: '#B08948' }} />
                   <YAxis allowDecimals={false} tick={{ fill: '#5E584E', fontSize: 12 }} axisLine={{ stroke: '#B08948' }} />
@@ -93,7 +96,8 @@ export function DealHealthPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </section>
+            </section>
+          </div>
         </>
       ) : null}
     </Page>

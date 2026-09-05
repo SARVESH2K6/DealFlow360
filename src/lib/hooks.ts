@@ -276,7 +276,7 @@ export function useFulfillmentDetail(id: string | undefined) {
 export function useFulfillmentAction(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (args: { action: 'accept-split' | 'override'; body?: unknown }) =>
+    mutationFn: (args: { action: 'accept-split' | 'override' | 'consolidate'; body?: unknown }) =>
       api<FulfillmentOrder>(`/api/fulfillment/${id}/${args.action}`, {
         method: 'POST',
         body: JSON.stringify(args.body ?? {}),
@@ -285,6 +285,18 @@ export function useFulfillmentAction(id: string) {
       qc.setQueryData(['fulfillment', id], data)
       void qc.invalidateQueries({ queryKey: ['fulfillment'] })
     },
+  })
+}
+
+export function useConsolidateFulfillment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (orderId: string) =>
+      api<FulfillmentOrder>(`/api/fulfillment/${orderId}/consolidate`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['fulfillment'] }),
   })
 }
 
@@ -367,10 +379,20 @@ export function useDealHealthAction() {
   })
 }
 
-export function useReports() {
+export function useReports(filters: { period: string; team: string; status: string; product: string }) {
+  const params = new URLSearchParams(filters)
   return useQuery({
-    queryKey: ['reports'],
-    queryFn: () => api<ReportsPayload>('/api/reports'),
+    queryKey: ['reports', filters],
+    queryFn: () => api<ReportsPayload>(`/api/reports?${params.toString()}`),
+  })
+}
+
+export function useCreateSubscription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Partial<Subscription> & { customerId?: string }) =>
+      api<Subscription>('/api/subscriptions', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['subscriptions'] }),
   })
 }
 
@@ -394,7 +416,7 @@ export function useCreateProduct() {
 export function usePatchProduct(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: Partial<Product>) =>
+    mutationFn: (body: Partial<Product> & { pricelists?: PriceList[] }) =>
       api<ProductDetailPayload>(`/api/products/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -445,6 +467,8 @@ export function usePortalNegotiate(id: string) {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['portal-quote', id] })
+      void qc.invalidateQueries({ queryKey: ['portal-messages'] })
+      void qc.invalidateQueries({ queryKey: ['portal-quotes'] })
     },
   })
 }
@@ -457,7 +481,10 @@ export function usePortalConfirm(id: string) {
         method: 'POST',
         body: JSON.stringify({}),
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['portal-quote', id] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['portal-quote', id] })
+      void qc.invalidateQueries({ queryKey: ['portal-quotes'] })
+    },
   })
 }
 

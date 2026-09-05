@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { LayoutGrid, Plus, Table2 } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
@@ -26,6 +27,7 @@ export function QuotationsListPage() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<QuotationStatus | 'all'>('all')
   const [query, setQuery] = useState('')
+  const [view, setView] = useState<'cards' | 'table'>('cards')
 
   const items = data?.items ?? []
   const filtered = useMemo(() => {
@@ -66,6 +68,7 @@ export function QuotationsListPage() {
         title="Quotations"
         actions={
           <Button variant="commit" onClick={() => void newQuote()} loading={create.isPending}>
+            <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden />
             New quotation
           </Button>
         }
@@ -95,8 +98,18 @@ export function QuotationsListPage() {
       ) : null}
 
       {isLoading ? <TableSkeleton /> : null}
+      {data ? <SearchField value={query} onChange={setQuery} placeholder="Search quotations" /> : null}
       {data ? (
-        <SearchField value={query} onChange={setQuery} placeholder="Search quotations" />
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={() => setView((v) => (v === 'cards' ? 'table' : 'cards'))}>
+            {view === 'cards' ? (
+              <Table2 className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+            ) : (
+              <LayoutGrid className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+            )}
+            {view === 'cards' ? 'Switch to Table View' : 'Switch to Card View'}
+          </Button>
+        </div>
       ) : null}
       {data && filtered.length === 0 ? (
         <EmptyState
@@ -106,13 +119,33 @@ export function QuotationsListPage() {
         />
       ) : null}
 
-      {data && filtered.length > 0 ? (
+      {data && filtered.length > 0 && view === 'table' ? (
         <DataTable
           columns={columns}
           rows={filtered}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate(`/app/quotations/${r.id}`)}
         />
+      ) : null}
+
+      {data && filtered.length > 0 && view === 'cards' ? (
+        <div className="grid grid-cols-3 gap-px bg-bronze/30">
+          {filtered.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              className="bg-sheet px-4 py-3 text-left hover:bg-surfaceAlt"
+              onClick={() => navigate(`/app/quotations/${q.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-bronze">{q.number}</p>
+                <Badge status={badgeFromStatus(q.status)}>{quotationStatusLabel(q.status)}</Badge>
+              </div>
+              <h3 className="mt-1.5 font-serif text-[16px] leading-tight text-ink">{q.customerName}</h3>
+              <p className="mt-1.5 font-serif text-[18px] tabular-nums text-ink">{money(q.amount)}</p>
+            </button>
+          ))}
+        </div>
       ) : null}
     </Page>
   )

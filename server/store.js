@@ -102,10 +102,68 @@ export function computeQuotationRisk(quotation) {
   return quotation
 }
 
-export function requiredApprovalLevel(quotation) {
-  if (quotation.riskLevel === 'HIGH') return 'finance'
-  if (quotation.riskLevel === 'MEDIUM') return 'manager'
+export function routingLevel(routing) {
+  const text = String(routing || '').toLowerCase()
+  if (text.includes('finance')) return 'finance'
+  if (text.includes('manager') || text.includes('sales')) return 'manager'
   return 'none'
+}
+
+export function requiredApprovalLevel(quotation) {
+  const trigger =
+    quotation.riskLevel === 'HIGH' ? 'high' : quotation.riskLevel === 'MEDIUM' ? 'medium' : 'within'
+  const row = (db.discountConfig?.approvalChain ?? []).find((c) => c.trigger === trigger)
+  return routingLevel(row?.routing)
+}
+
+export function remainingBackorderQty(order) {
+  return order.lines.reduce((sum, line) => {
+    const filled = line.suggested.reduce((n, row) => n + Number(row.qtyFulfilled || 0), 0)
+    return sum + Math.max(0, line.qty - filled)
+  }, 0)
+}
+
+export function canConsolidateBackorder(order) {
+  if (!order || order.status !== 'backorder') return false
+  if (remainingBackorderQty(order) <= 0) return false
+  return order.lines.every((line) => {
+    const filled = line.suggested.reduce((n, row) => n + Number(row.qtyFulfilled || 0), 0)
+    const remaining = Math.max(0, line.qty - filled)
+    if (remaining === 0) return true
+    const available = db.stock
+      .filter((s) => s.productId === line.productId)
+      .reduce((n, s) => n + Math.max(0, s.inStock - s.reserved), 0)
+    return available >= remaining
+  })
+}
+
+export function consolidateBackorder(order) {
+  for (const line of order.lines) {
+    let remaining = line.qty - line.suggested.reduce((n, row) => n + Number(row.qtyFulfilled || 0), 0)
+    if (remaining <= 0) continue
+    const ensureRow = (warehouse) => {
+      let row = line.suggested.find((r) => r.warehouse === warehouse)
+      if (!row) {
+        row = { warehouse, qtyFulfilled: 0, estShipments: 1, cost: 0, available: 0 }
+        line.suggested.push(row)
+      }
+      return row
+    }
+    for (const stock of db.stock.filter((s) => s.productId === line.productId)) {
+      if (remaining <= 0) break
+      const avail = Math.max(0, stock.inStock - stock.reserved)
+      const take = Math.min(remaining, avail)
+      if (take <= 0) continue
+      const row = ensureRow(stock.warehouse)
+      row.qtyFulfilled += take
+      stock.reserved += take
+      row.available = Math.max(0, stock.inStock - stock.reserved)
+      remaining -= take
+    }
+  }
+  order.status = 'ready'
+  order.consolidated = true
+  return order
 }
 
 const UPSELL_PAIRS = {
@@ -553,7 +611,7 @@ function seed() {
     id: 'q-1048',
     number: 'Q-1048',
     customerId: 'c-globex',
-    date: iso(9, 15),
+    date: iso(110, 15),
     repId: 'u-rep',
     repName: 'Alex Rivera',
     status: 'confirmed',
@@ -804,8 +862,7 @@ function seed() {
           productName: 'Industrial Sensor Array',
           qty: 3,
           suggested: [
-            { warehouse: 'East DC', qtyFulfilled: 2, estShipments: 1, cost: 120, available: 34 },
-            { warehouse: 'Central DC', qtyFulfilled: 1, estShipments: 1, cost: 95, available: 25 },
+            { warehouse: 'East DC', qtyFulfilled: 1, estShipments: 1, cost: 120, available: 34 },
           ],
         },
         {

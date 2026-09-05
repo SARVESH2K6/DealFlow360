@@ -85,28 +85,25 @@ export function ApprovalDetailPage() {
         <StatCard label="Customer Tier" value={data.customerTier} sublabel={money(data.amount)} />
       </div>
 
-      <div>
-        <InfoBanner>Why this quote was flagged</InfoBanner>
-        <div className="mt-2">
-          <DataTable
-            columns={reasonCols}
-            rows={data.flagReasons}
-            rowKey={(r) => r.line}
-            emptyMessage="No line exceeded its limit."
-          />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div>
+          <InfoBanner>Why this quote was flagged</InfoBanner>
+          <div className="mt-2">
+            <DataTable
+              columns={reasonCols}
+              rows={data.flagReasons}
+              rowKey={(r) => r.line}
+              emptyMessage="No line exceeded its limit."
+            />
+          </div>
         </div>
-      </div>
-
-      <StatusStepper steps={STEPS} currentStep={stepIndex(data.stage)} />
-
-      <section>
-        <h2 className="mb-3 text-[15px] font-medium text-ink">Line items</h2>
-        <div className="overflow-hidden rounded-md border border-border bg-surface">
+        <section>
+          <h2 className="mb-2 font-serif text-[18px] text-ink">Line items</h2>
           <table className="w-full text-left">
             <thead>
-              <tr className="h-9 bg-surfaceAlt">
+              <tr className="border-b border-bronze/40">
                 {['Product', 'Qty', 'Price', 'Discount %', 'Limit', 'Status'].map((h) => (
-                  <th key={h} className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">
+                  <th key={h} className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">
                     {h}
                   </th>
                 ))}
@@ -114,22 +111,24 @@ export function ApprovalDetailPage() {
             </thead>
             <tbody>
               {data.quotation.lines.map((l) => (
-                <tr key={l.id} className="h-11 border-b border-border last:border-0">
-                  <td className="px-3">{l.productName}</td>
-                  <td className="px-3">{l.qty}</td>
-                  <td className="px-3">{money(l.price)}</td>
-                  <td className="px-3">{l.discountPercent}%</td>
-                  <td className="px-3">{l.limit}%</td>
-                  <td className="px-3 text-inkMuted">{l.status}</td>
+                <tr key={l.id} className="h-9 border-b border-ink/[0.08] last:border-0">
+                  <td className="pr-3 text-[13px]">{l.productName}</td>
+                  <td className="pr-3 font-serif text-[15px] tabular-nums">{l.qty}</td>
+                  <td className="pr-3 font-serif text-[15px] tabular-nums">{money(l.price)}</td>
+                  <td className="pr-3 font-serif text-[15px] tabular-nums">{l.discountPercent}%</td>
+                  <td className="pr-3 font-serif text-[15px] tabular-nums">{l.limit}%</td>
+                  <td className="text-[12px] text-inkMuted">{l.status}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </section>
+        </section>
+      </div>
+
+      <StatusStepper steps={STEPS} currentStep={stepIndex(data.stage)} />
 
       <section>
-        <h2 className="mb-3 text-[15px] font-medium text-ink">Audit log</h2>
+        <h2 className="mb-2 font-serif text-[18px] text-ink">Audit log</h2>
         <DataTable columns={auditCols} rows={data.auditLog} rowKey={(r) => r.date + r.action} emptyMessage="No audit entries." />
       </section>
 

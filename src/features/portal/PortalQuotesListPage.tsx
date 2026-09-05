@@ -34,7 +34,7 @@ export function PortalQuotesListPage() {
 
   return (
     <Page>
-      <PageHeader title="My Quotations" />
+      <PageHeader kicker="Customer portal" title="Quotes" />
       {isLoading ? <TableSkeleton /> : null}
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
@@ -45,7 +45,7 @@ export function PortalQuotesListPage() {
             rows={rows}
             rowKey={(r) => r.id}
             onRowClick={(r) => navigate(`/portal/quote/${r.id}`)}
-            emptyMessage="No quotations have been shared with you yet."
+            emptyMessage="No quotes have been shared with you yet."
           />
         </>
       ) : null}

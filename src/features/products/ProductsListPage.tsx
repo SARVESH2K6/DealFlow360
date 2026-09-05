@@ -70,7 +70,7 @@ export function ProductsListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-px bg-bronze/30">
             <StatCard label="Total Products" value={data.stats.totalProducts} />
             <StatCard label="Pricelists" value={data.stats.pricelists} />
             <StatCard label="Variants" value={data.stats.variants} />

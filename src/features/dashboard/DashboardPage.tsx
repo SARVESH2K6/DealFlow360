@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ClipboardList, Plus } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { ErrorState, Page, PageHeader, SearchField, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, SectionTitle, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { StatCard } from '../../components/ui/StatCard'
 import { canSeeApprovals, useAuth } from '../../lib/auth'
 import { formatDateTime, money, quotationStatusLabel } from '../../lib/format'
 import { useCreateQuotation, useDashboard } from '../../lib/hooks'
@@ -63,21 +65,25 @@ export function DashboardPage() {
     },
   ]
 
+  const activity = (data?.activity ?? []).slice(0, 8)
+
   return (
     <Page>
       <PageHeader
-        kicker="Confidential ledger"
-        title="Portfolio"
+        kicker="Internal workspace"
+        title="Sales Dashboard"
         actions={
           <>
+            <Button variant="commit" loading={create.isPending} onClick={() => void newQuote()}>
+              <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+              New Quotation
+            </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               onClick={() => navigate(canSeeApprovals(user?.role) ? '/app/approvals' : '/app/quotations')}
             >
-              {canSeeApprovals(user?.role) ? 'Approvals' : 'Quotations'}
-            </Button>
-            <Button variant="commit" loading={create.isPending} onClick={() => void newQuote()}>
-              New quotation
+              <ClipboardList className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+              {canSeeApprovals(user?.role) ? 'View Approvals' : 'View Quotations'}
             </Button>
           </>
         }
@@ -88,67 +94,56 @@ export function DashboardPage() {
 
       {data ? (
         <div className="grid grid-cols-3 gap-px bg-bronze/30">
-          <Metric
-            label="Total deal value"
-            value={money(data.totalDealValue ?? deals.reduce((sum, d) => sum + d.amount, 0))}
-          />
-          <Metric label="Active deals" value={String(data.openQuotations)} />
-          <Metric label="Avg. discount" value={`${(data.avgDiscount ?? 0).toFixed(1)}%`} />
+          <StatCard label="Pending Approvals" value={data.pendingApprovals} />
+          <StatCard label="Open Quotations" value={data.openQuotations} />
+          <StatCard label="At Risk Deals" value={data.atRiskDeals} tone="warn" />
         </div>
       ) : null}
 
-      <section>
-        <h2 className="mb-1 font-serif text-[22px] text-ink">Holdings</h2>
-        <p className="mb-5 text-[13px] text-inkMuted">Open and settled deals across the book.</p>
-        <SearchField value={query} onChange={setQuery} placeholder="Search holdings" />
-        {isLoading ? <TableSkeleton /> : null}
-        {data && visibleDeals.length === 0 ? (
-          <EmptyState
-            title="A blank statement"
-            message={query ? 'No holdings match that search.' : 'No deals have been posted. Open a quotation to begin the book.'}
-            action={{ label: 'New quotation', onClick: () => void newQuote() }}
-          />
-        ) : null}
-        {visibleDeals.length > 0 ? (
-          <DataTable
-            columns={columns}
-            rows={visibleDeals}
-            rowKey={(r) => r.id}
-            onRowClick={(r) => navigate(`/app/quotations/${r.id}`)}
-          />
-        ) : null}
-      </section>
+      {data ? <SearchField value={query} onChange={setQuery} placeholder="Search holdings" /> : null}
 
-      <section>
-        <h2 className="mb-5 font-serif text-[22px] text-ink">Recent activity</h2>
-        {data && data.activity.length === 0 ? (
-          <p className="text-[14px] text-inkMuted">No recent entries.</p>
-        ) : (
-          <ul>
-            {data?.activity.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-baseline justify-between gap-8 border-b border-ink/[0.08] py-3.5 last:border-0"
-              >
-                <span className="text-[14px] text-inkMuted">{item.text}</span>
-                <span className="shrink-0 text-[11px] uppercase tracking-[0.08em] text-inkFaint">
-                  {formatDateTime(item.timestamp)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+        <section>
+          <SectionTitle>Recent activity</SectionTitle>
+          {data && data.activity.length === 0 ? (
+            <p className="text-[13px] text-inkMuted">No recent entries.</p>
+          ) : (
+            <ul>
+              {activity.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-baseline justify-between gap-6 border-b border-ink/[0.08] py-1.5 last:border-0"
+                >
+                  <span className="min-w-0 truncate text-[13px] text-inkMuted">{item.text}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-[0.08em] text-inkFaint">
+                    {formatDateTime(item.timestamp)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <SectionTitle>Holdings</SectionTitle>
+          {isLoading ? <TableSkeleton /> : null}
+          {data && visibleDeals.length === 0 ? (
+            <EmptyState
+              title="A blank statement"
+              message={query ? 'No holdings match that search.' : 'No deals have been posted. Open a quotation to begin the book.'}
+              action={{ label: 'New quotation', onClick: () => void newQuote() }}
+            />
+          ) : null}
+          {visibleDeals.length > 0 ? (
+            <DataTable
+              columns={columns}
+              rows={visibleDeals}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => navigate(`/app/quotations/${r.id}`)}
+            />
+          ) : null}
+        </section>
+      </div>
     </Page>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-sheet px-6 py-6">
-      <div className="h-px w-10 bg-bronze" />
-      <div className="mt-4 font-serif text-[40px] leading-none tracking-tight text-ink">{value}</div>
-      <div className="mt-3 text-[10px] font-medium uppercase tracking-[0.16em] text-inkMuted">{label}</div>
-    </div>
   )
 }

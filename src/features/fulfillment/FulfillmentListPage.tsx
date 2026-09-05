@@ -1,18 +1,24 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { InfoBanner } from '../../components/ui/InfoBanner'
 import { ErrorState, Page, PageHeader, SearchField, TableSkeleton } from '../../components/ui/Page'
+import { useToast } from '../../components/ui/Toast'
 import { quotationStatusLabel } from '../../lib/format'
-import { useFulfillment } from '../../lib/hooks'
+import { useFulfillment, useConsolidateFulfillment } from '../../lib/hooks'
 import { matchesSearch } from '../../lib/search'
 import type { FulfillmentOrderListItem, StockRow } from '../../lib/types'
 
 export function FulfillmentListPage() {
   const { data, isLoading, isError, error } = useFulfillment()
   const navigate = useNavigate()
+  const { push } = useToast()
   const [query, setQuery] = useState('')
+  const consolidatable = (data?.orders ?? []).filter((o) => o.canConsolidate)
+  const firstPrompt = consolidatable[0]
+  const consolidate = useConsolidateFulfillment()
 
   const stock = useMemo(
     () =>
@@ -55,6 +61,28 @@ export function FulfillmentListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
         <>
+          {firstPrompt ? (
+            <div className="flex items-center justify-between gap-6 border-l-[3px] border-warn bg-warnBg/40 px-4 py-3">
+              <p className="text-[13px] leading-relaxed text-warn">
+                Stock has arrived for {firstPrompt.orderNumber}. Consolidate remaining backorder
+                {firstPrompt.remainingQty ? ` (${firstPrompt.remainingQty} units)` : ''}?
+              </p>
+              <Button
+                variant="commit"
+                loading={consolidate.isPending}
+                onClick={async () => {
+                  await consolidate.mutateAsync(firstPrompt.id)
+                  push('Remaining backorder consolidated.', 'ok')
+                }}
+              >
+                Consolidate Remaining Backorder
+              </Button>
+            </div>
+          ) : (
+            <InfoBanner>
+              A Consolidate Remaining Backorder prompt appears automatically once stock arrives for a backorder.
+            </InfoBanner>
+          )}
           <SearchField value={query} onChange={setQuery} placeholder="Search stock or orders" />
           <section>
             <h2 className="mb-3 text-[15px] font-medium text-ink">Live stock</h2>
@@ -70,9 +98,6 @@ export function FulfillmentListPage() {
               emptyMessage="No orders awaiting fulfillment."
             />
           </section>
-          <InfoBanner>
-            &apos;Consolidate Remaining Backorder&apos; prompt appears automatically once stock arrives.
-          </InfoBanner>
         </>
       ) : null}
     </Page>

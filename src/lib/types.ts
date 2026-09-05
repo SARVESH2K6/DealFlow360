@@ -228,6 +228,8 @@ export interface FulfillmentOrderListItem {
   customerName: string
   status: string
   warehouse: string
+  canConsolidate?: boolean
+  remainingQty?: number
 }
 
 export interface FulfillmentSplitRow {
@@ -256,6 +258,9 @@ export interface FulfillmentOrder {
   lines: FulfillmentLine[]
   splitAccepted?: boolean
   overridden?: boolean
+  canConsolidate?: boolean
+  remainingQty?: number
+  consolidated?: boolean
 }
 
 export interface FulfillmentPayload {
@@ -352,6 +357,13 @@ export interface ReportsPayload {
   quotesCreated: number
   avgApprovalTime: string
   topUpsellProduct: string
+  filters?: { period: string; team: string; status: string; product: string }
+  options?: {
+    periods: string[]
+    teams: string[]
+    statuses: string[]
+    products: string[]
+  }
 }
 
 export interface ProductsPayload {
@@ -374,12 +386,21 @@ export interface DiscountConfig {
 export interface PortalQuoteLine {
   id: string
   productName: string
+  description: string
   qty: number
   price: number
   discountPercent: number
   comment: string
   counterDiscount: number
   amount: number
+  taxPercent: number
+}
+
+export interface PortalHistoryItem {
+  from: string
+  action: string
+  body: string
+  date: string
 }
 
 export interface PortalQuote {
@@ -392,6 +413,10 @@ export interface PortalQuote {
   requestedDeliveryDate: string
   currency: string
   terms: string
+  date: string
+  repName: string
+  region: string
+  history: PortalHistoryItem[]
   lines: PortalQuoteLine[]
 }
 

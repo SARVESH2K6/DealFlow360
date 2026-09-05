@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { Loader2 } from 'lucide-react'
 
 type Variant = 'commit' | 'primary' | 'secondary' | 'danger' | 'ghost'
 
@@ -29,10 +30,11 @@ export function Button({
     <button
       type={type}
       disabled={disabled || loading}
-      className={`inline-flex h-10 items-center justify-center gap-2 px-5 text-[12px] font-medium uppercase tracking-[0.14em] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
+      className={`inline-flex h-8 items-center justify-center gap-1.5 px-3.5 text-[11px] font-medium uppercase tracking-[0.12em] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
       {...rest}
     >
-      {loading ? <span className="tracking-[0.14em]">Working</span> : children}
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden /> : null}
+      {children}
     </button>
   )
 }

@@ -16,6 +16,9 @@ import {
   publicUser,
   quotationVisibleTo,
   requiredApprovalLevel,
+  canConsolidateBackorder,
+  consolidateBackorder,
+  remainingBackorderQty,
 } from './store.js'
 
 const app = express()
@@ -439,7 +442,7 @@ app.post('/api/approvals/:id/approve', auth, (req, res) => {
   if (!canActOnStep(req.user, approval)) return res.status(403).json({ error: 'Not assigned to this step' })
   const quotation = db.quotations.find((q) => q.id === approval.quotationId)
   const note = String(req.body?.note || 'Approved.')
-  if (approval.stage === 'sales_manager' && quotation.riskLevel === 'HIGH') {
+  if (approval.stage === 'sales_manager' && requiredApprovalLevel(quotation) === 'finance') {
     approval.stage = 'finance'
     approval.assignedTo = 'Sam Patel'
     approval.assignedRole = 'finance'
@@ -505,6 +508,8 @@ app.get('/api/fulfillment', auth, (_req, res) => {
       customerName: f.customerName,
       status: f.status,
       warehouse: f.warehouse,
+      canConsolidate: canConsolidateBackorder(f),
+      remainingQty: remainingBackorderQty(f),
     })),
   })
 })
@@ -512,7 +517,11 @@ app.get('/api/fulfillment', auth, (_req, res) => {
 app.get('/api/fulfillment/:id', auth, (req, res) => {
   const order = db.fulfillment.find((f) => f.id === req.params.id)
   if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
-  res.json(order)
+  res.json({
+    ...order,
+    canConsolidate: canConsolidateBackorder(order),
+    remainingQty: remainingBackorderQty(order),
+  })
 })
 
 app.post('/api/fulfillment/:id/accept-split', auth, requireRoles(['finance', 'admin']), (req, res) => {
@@ -522,7 +531,7 @@ app.post('/api/fulfillment/:id/accept-split', auth, requireRoles(['finance', 'ad
   order.splitAccepted = true
   logActivity(`${order.orderNumber} split shipment accepted by ${req.user.name}`)
   io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: order.id })
-  res.json(order)
+  res.json({ ...order, canConsolidate: canConsolidateBackorder(order), remainingQty: remainingBackorderQty(order) })
 })
 
 app.post('/api/fulfillment/:id/override', auth, requireRoles(['finance', 'admin']), (req, res) => {
@@ -535,7 +544,19 @@ app.post('/api/fulfillment/:id/override', auth, requireRoles(['finance', 'admin'
   order.overridden = true
   logActivity(`${order.orderNumber} inventory override by ${req.user.name}`)
   io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: order.id })
-  res.json(order)
+  res.json({ ...order, canConsolidate: canConsolidateBackorder(order), remainingQty: remainingBackorderQty(order) })
+})
+
+app.post('/api/fulfillment/:id/consolidate', auth, (req, res) => {
+  const order = db.fulfillment.find((f) => f.id === req.params.id)
+  if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
+  if (!canConsolidateBackorder(order)) {
+    return res.status(400).json({ error: 'Remaining backorder cannot be consolidated yet' })
+  }
+  consolidateBackorder(order)
+  logActivity(`${order.orderNumber} remaining backorder consolidated by ${req.user.name}`)
+  io.to('workspace').emit('workspace:updated', { type: 'fulfillment', id: order.id })
+  res.json({ ...order, canConsolidate: false, remainingQty: remainingBackorderQty(order) })
 })
 
 app.get('/api/subscriptions', auth, (_req, res) => {
@@ -585,12 +606,16 @@ app.post('/api/subscriptions/:id/cancel', auth, (req, res) => {
 app.post('/api/subscriptions/:id/modify', auth, (req, res) => {
   const sub = db.subscriptions.find((s) => s.id === req.params.id)
   if (!sub) return res.status(404).json({ error: 'Subscription not found' })
+  if (req.body?.plan) sub.plan = String(req.body.plan)
   if (req.body?.cycle) sub.cycle = req.body.cycle
   if (req.body?.amount !== undefined) sub.amount = Number(req.body.amount)
   if (req.body?.status) sub.status = req.body.status
+  if (req.body?.nextBill) sub.nextBill = req.body.nextBill
   if (sub.recurringLines[0]) {
+    sub.recurringLines[0].plan = sub.plan
     sub.recurringLines[0].cycle = sub.cycle
     sub.recurringLines[0].amount = sub.amount
+    if (req.body?.nextBill) sub.recurringLines[0].nextBillDate = req.body.nextBill
   }
   logActivity(`${sub.plan} for ${sub.customerName} modified by ${req.user.name}`)
   res.json(sub)
@@ -681,11 +706,71 @@ app.post('/api/deal-health/:id/nudge', auth, (req, res) => {
 })
 
 app.get('/api/reports', auth, requireRoles(['admin']), (req, res) => {
+  const period = String(req.query.period || 'Q3 2026')
+  const team = String(req.query.team || 'All')
+  const status = String(req.query.status || 'All')
+  const product = String(req.query.product || 'All')
+
+  const inPeriod = (isoDate) => {
+    const d = new Date(isoDate)
+    const y = d.getUTCFullYear()
+    const m = d.getUTCMonth()
+    if (period === 'YTD') return y === 2026
+    if (period === 'Q2 2026') return y === 2026 && m >= 3 && m <= 5
+    return y === 2026 && m >= 6 && m <= 8
+  }
+
+  let quotes = db.quotations.filter((q) => inPeriod(q.date))
+  if (team !== 'All') quotes = quotes.filter((q) => q.region === team)
+  if (status === 'Pending') quotes = quotes.filter((q) => q.status === 'pending_approval')
+  if (status === 'Approved') {
+    quotes = quotes.filter((q) => ['approved', 'confirmed', 'negotiation'].includes(q.status))
+  }
+  if (product !== 'All') quotes = quotes.filter((q) => q.lines.some((l) => l.productName === product))
+
+  const quoteIds = new Set(quotes.map((q) => q.id))
+  const durations = db.approvals
+    .filter((a) => quoteIds.has(a.quotationId))
+    .map((a) => {
+      const submitted = a.auditLog.find((e) => e.action === 'Submitted')
+      const approved = [...a.auditLog].reverse().find((e) => e.action === 'Approved' || e.action === 'Auto-approved')
+      if (submitted && approved) {
+        return Math.max(0, (new Date(approved.date) - new Date(submitted.date)) / 86400000)
+      }
+      return a.status === 'approved' ? a.daysPending : null
+    })
+    .filter((n) => n !== null)
+  const avgDays = durations.length ? durations.reduce((s, n) => s + n, 0) / durations.length : 0
+
+  const productCounts = new Map()
+  for (const q of quotes) {
+    for (const line of q.lines) {
+      productCounts.set(line.productName, (productCounts.get(line.productName) || 0) + line.qty)
+    }
+  }
+  let topUpsellProduct = '—'
+  let topCount = 0
+  for (const [name, count] of productCounts) {
+    if (count > topCount) {
+      topUpsellProduct = name
+      topCount = count
+    }
+  }
+
+  const teams = [...new Set(db.quotations.map((q) => q.region))].sort()
+  const products = [...new Set(db.products.map((p) => p.name))]
+
   res.json({
-    quotesCreated: db.quotations.length,
-    avgApprovalTime: '1.8 days',
-    topUpsellProduct: '24/7 Support Retainer',
-    filters: req.query,
+    quotesCreated: quotes.length,
+    avgApprovalTime: durations.length ? `${avgDays.toFixed(1)} days` : '—',
+    topUpsellProduct,
+    filters: { period, team, status, product },
+    options: {
+      periods: ['Q3 2026', 'Q2 2026', 'YTD'],
+      teams,
+      statuses: ['All', 'Pending', 'Approved'],
+      products,
+    },
   })
 })
 
@@ -732,6 +817,12 @@ app.patch('/api/products/:id', auth, requireRoles(['admin']), (req, res) => {
   for (const key of fields) {
     if (req.body?.[key] !== undefined) product[key] = req.body[key]
   }
+  if (Array.isArray(req.body?.pricelists)) {
+    for (const incoming of req.body.pricelists) {
+      const list = db.pricelists.find((p) => p.id === incoming.id)
+      if (list && Array.isArray(incoming.rules)) list.rules = incoming.rules
+    }
+  }
   if (!product.isSubscription) {
     product.cycle = null
     product.quantity = null
@@ -760,6 +851,58 @@ app.get('/api/portal/quotes', auth, requireRoles(['customer']), (req, res) => {
   res.json({ items })
 })
 
+function portalQuotePayload(quotation) {
+  computeQuotationRisk(quotation)
+  const approval = db.approvals.find((a) => a.quotationId === quotation.id)
+  const history = [
+    ...(approval?.auditLog ?? []).map((e) => ({
+      from: e.user,
+      action: e.action,
+      body: e.note,
+      date: e.date,
+    })),
+    ...db.portalMessages
+      .filter((m) => m.quotationId === quotation.id)
+      .map((m) => ({
+        from: m.from,
+        action: 'Message',
+        body: m.body,
+        date: m.date,
+      })),
+  ].sort((a, b) => new Date(a.date) - new Date(b.date))
+  const safeLines = quotation.lines.map((l) => {
+    const product = db.products.find((p) => p.id === l.productId)
+    return {
+      id: l.id,
+      productName: l.productName,
+      description: product?.description || l.category || '',
+      qty: l.qty,
+      price: l.price,
+      discountPercent: l.discountPercent,
+      comment: l.comment || '',
+      counterDiscount: l.counterDiscount ?? l.discountPercent,
+      amount: l.qty * l.price * (1 - l.discountPercent / 100),
+      taxPercent: product?.taxPercent ?? 0,
+    }
+  })
+  return {
+    id: quotation.id,
+    number: quotation.number,
+    customerName: quotation.customerName,
+    amount: quotation.amount,
+    status: quotation.status,
+    portalStatus: quotation.portalStatus || (quotation.status === 'confirmed' ? 'confirmed' : 'sent'),
+    requestedDeliveryDate: quotation.requestedDeliveryDate || '',
+    currency: quotation.currency,
+    terms: quotation.terms,
+    date: quotation.date,
+    repName: quotation.repName,
+    region: quotation.region,
+    history,
+    lines: safeLines,
+  }
+}
+
 app.get('/api/portal/quote/:id', auth, requireRoles(['customer']), (req, res) => {
   const quotation = db.quotations.find((q) => q.id === req.params.id)
   if (
@@ -770,29 +913,7 @@ app.get('/api/portal/quote/:id', auth, requireRoles(['customer']), (req, res) =>
   ) {
     return res.status(404).json({ error: 'Quotation not found' })
   }
-  computeQuotationRisk(quotation)
-  const safeLines = quotation.lines.map((l) => ({
-    id: l.id,
-    productName: l.productName,
-    qty: l.qty,
-    price: l.price,
-    discountPercent: l.discountPercent,
-    comment: l.comment || '',
-    counterDiscount: l.counterDiscount ?? l.discountPercent,
-    amount: l.qty * l.price * (1 - l.discountPercent / 100),
-  }))
-  res.json({
-    id: quotation.id,
-    number: quotation.number,
-    customerName: quotation.customerName,
-    amount: quotation.amount,
-    status: quotation.status,
-    portalStatus: quotation.portalStatus || (quotation.status === 'confirmed' ? 'confirmed' : 'sent'),
-    requestedDeliveryDate: quotation.requestedDeliveryDate || '',
-    currency: quotation.currency,
-    terms: quotation.terms,
-    lines: safeLines,
-  })
+  res.json(portalQuotePayload(quotation))
 })
 
 app.post('/api/portal/quote/:id/negotiate', auth, requireRoles(['customer']), (req, res) => {
@@ -800,14 +921,28 @@ app.post('/api/portal/quote/:id/negotiate', auth, requireRoles(['customer']), (r
   if (!quotation || quotation.customerId !== req.user.customerId) {
     return res.status(404).json({ error: 'Quotation not found' })
   }
+  if (quotation.status === 'confirmed' || quotation.portalStatus === 'confirmed') {
+    return res.status(409).json({ error: 'This quotation is already accepted.' })
+  }
   const lines = Array.isArray(req.body?.lines) ? req.body.lines : []
   for (const incoming of lines) {
     const line = quotation.lines.find((l) => l.id === incoming.id)
     if (!line) continue
     if (incoming.comment !== undefined) line.comment = String(incoming.comment)
-    if (incoming.counterDiscount !== undefined) {
-      line.counterDiscount = Number(incoming.counterDiscount)
-      line.discountPercent = Number(incoming.counterDiscount)
+    if (incoming.qty !== undefined) {
+      const qty = Number(incoming.qty)
+      if (Number.isFinite(qty)) line.qty = Math.max(1, Math.round(qty))
+    }
+    let nextDiscount = incoming.counterDiscount
+    if (incoming.unitPrice !== undefined && Number.isFinite(Number(incoming.unitPrice)) && line.price > 0) {
+      nextDiscount = (1 - Number(incoming.unitPrice) / line.price) * 100
+    }
+    if (nextDiscount !== undefined) {
+      const n = Number(nextDiscount)
+      if (!Number.isFinite(n)) continue
+      const clamped = Math.max(0, Math.min(80, n))
+      line.counterDiscount = clamped
+      line.discountPercent = clamped
     }
   }
   if (req.body?.requestedDeliveryDate) {
@@ -859,6 +994,9 @@ app.post('/api/portal/quote/:id/confirm', auth, requireRoles(['customer']), (req
   const quotation = db.quotations.find((q) => q.id === req.params.id)
   if (!quotation || quotation.customerId !== req.user.customerId) {
     return res.status(404).json({ error: 'Quotation not found' })
+  }
+  if (quotation.status === 'confirmed' || quotation.portalStatus === 'confirmed') {
+    return res.json({ ok: true, reenteredApproval: false })
   }
   computeQuotationRisk(quotation)
   const level = requiredApprovalLevel(quotation)
