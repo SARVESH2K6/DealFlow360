@@ -294,6 +294,19 @@ export interface InvoiceLine {
   dueDate: string
 }
 
+export interface InvoiceItem {
+  description: string
+  qty: number
+  unitPrice: number
+  amount: number
+}
+
+export interface InvoiceApprover {
+  name: string
+  role: string
+  roleLabel: string
+}
+
 export interface Invoice {
   id: string
   number: string
@@ -302,9 +315,15 @@ export interface Invoice {
   amount: number
   status: 'paid' | 'unpaid'
   dueDate: string
+  issuedDate: string
+  terms: string
+  region: string
   step: 'confirmed' | 'shipped' | 'invoiced' | 'paid'
   note: string
+  items: InvoiceItem[]
   lines: InvoiceLine[]
+  approvedBy: InvoiceApprover[]
+  paymentRecordedBy: InvoiceApprover | null
 }
 
 export interface DealHealthItem {

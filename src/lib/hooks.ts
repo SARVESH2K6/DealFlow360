@@ -333,11 +333,14 @@ export function useInvoiceDetail(id: string | undefined) {
   })
 }
 
-export function useRecordPayment(id: string) {
+export function useSetInvoiceStatus(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () =>
-      api<Invoice>(`/api/invoices/${id}/record-payment`, { method: 'POST', body: JSON.stringify({}) }),
+    mutationFn: (status: 'paid' | 'unpaid') =>
+      api<Invoice>(`/api/invoices/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      }),
     onSuccess: (data) => {
       qc.setQueryData(['invoices', id], data)
       void qc.invalidateQueries({ queryKey: ['invoices'] })

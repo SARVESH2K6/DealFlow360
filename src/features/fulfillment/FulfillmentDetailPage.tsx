@@ -4,17 +4,20 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { ErrorState, Page, PageHeader, TableSkeleton, inputCls } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/Toast'
+import { canSplitFulfillment, useAuth } from '../../lib/auth'
 import { quotationStatusLabel } from '../../lib/format'
 import { useFulfillmentAction, useFulfillmentDetail } from '../../lib/hooks'
 import type { FulfillmentOrder } from '../../lib/types'
 
 export function FulfillmentDetailPage() {
   const { id } = useParams()
+  const { user } = useAuth()
   const { push } = useToast()
   const { data, isLoading, isError, error } = useFulfillmentDetail(id)
   const action = useFulfillmentAction(id ?? '')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<FulfillmentOrder | null>(null)
+  const canSplit = canSplitFulfillment(user?.role)
 
   if (isLoading) {
     return (
@@ -78,7 +81,7 @@ export function FulfillmentDetailPage() {
                   <tr key={row.warehouse} className="h-11 border-b border-border last:border-0">
                     <td className="px-3">{row.warehouse}</td>
                     <td className="px-3">
-                      {editing ? (
+                      {canSplit && editing ? (
                         <input
                           className={inputCls('w-24')}
                           type="number"
@@ -99,43 +102,49 @@ export function FulfillmentDetailPage() {
         </section>
       ))}
 
-      <div className="flex gap-2">
-        <Button
-          variant="commit"
-          loading={action.isPending && action.variables?.action === 'accept-split'}
-          onClick={async () => {
-            await action.mutateAsync({ action: 'accept-split' })
-            push('Suggested split accepted.', 'ok')
-            setEditing(false)
-          }}
-        >
-          Accept Suggested Split
-        </Button>
-        {!editing ? (
+      {canSplit ? (
+        <div className="flex gap-2">
           <Button
-            variant="secondary"
-            onClick={() => {
-              setDraft(data)
-              setEditing(true)
-            }}
-          >
-            Manual Override
-          </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            loading={action.isPending && action.variables?.action === 'override'}
+            variant="commit"
+            loading={action.isPending && action.variables?.action === 'accept-split'}
             onClick={async () => {
-              if (!draft) return
-              await action.mutateAsync({ action: 'override', body: { lines: draft.lines } })
-              push('Override saved.', 'ok')
+              await action.mutateAsync({ action: 'accept-split' })
+              push('Suggested split accepted.', 'ok')
               setEditing(false)
             }}
           >
-            Save override
+            Accept Suggested Split
           </Button>
-        )}
-      </div>
+          {!editing ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDraft(data)
+                setEditing(true)
+              }}
+            >
+              Manual Override
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              loading={action.isPending && action.variables?.action === 'override'}
+              onClick={async () => {
+                if (!draft) return
+                await action.mutateAsync({ action: 'override', body: { lines: draft.lines } })
+                push('Override saved.', 'ok')
+                setEditing(false)
+              }}
+            >
+              Save override
+            </Button>
+          )}
+        </div>
+      ) : (
+        <p className="text-[13px] text-inkMuted">
+          Suggested split and manual override are recorded by Finance or Admin.
+        </p>
+      )}
     </Page>
   )
 }

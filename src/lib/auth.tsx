@@ -109,6 +109,10 @@ export function canActOnApprovals(role: Role | undefined): boolean {
   return role === 'manager' || role === 'finance' || role === 'admin'
 }
 
-export function canRecordPayment(role: Role | undefined): boolean {
-  return role === 'finance' || role === 'admin' || role === 'manager'
+export function canSplitFulfillment(role: Role | undefined): boolean {
+  return role === 'finance' || role === 'admin'
+}
+
+export function canSetInvoiceStatus(role: Role | undefined): boolean {
+  return role === 'rep' || role === 'manager' || role === 'admin'
 }

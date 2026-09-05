@@ -498,7 +498,7 @@ app.get('/api/fulfillment/:id', auth, (req, res) => {
   res.json(order)
 })
 
-app.post('/api/fulfillment/:id/accept-split', auth, (req, res) => {
+app.post('/api/fulfillment/:id/accept-split', auth, requireRoles(['finance', 'admin']), (req, res) => {
   const order = db.fulfillment.find((f) => f.id === req.params.id)
   if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
   order.status = 'ready'
@@ -508,7 +508,7 @@ app.post('/api/fulfillment/:id/accept-split', auth, (req, res) => {
   res.json(order)
 })
 
-app.post('/api/fulfillment/:id/override', auth, (req, res) => {
+app.post('/api/fulfillment/:id/override', auth, requireRoles(['finance', 'admin']), (req, res) => {
   const order = db.fulfillment.find((f) => f.id === req.params.id)
   if (!order) return res.status(404).json({ error: 'Fulfillment order not found' })
   if (Array.isArray(req.body?.lines)) {
@@ -589,15 +589,42 @@ app.get('/api/invoices/:id', auth, (req, res) => {
   res.json(invoice)
 })
 
-app.post('/api/invoices/:id/record-payment', auth, requireRoles(['finance', 'admin', 'manager']), (req, res) => {
+function applyInvoiceStatus(invoice, status, user) {
+  const paid = status === 'paid'
+  invoice.status = paid ? 'paid' : 'unpaid'
+  invoice.step = paid ? 'paid' : 'invoiced'
+  invoice.lines = invoice.lines.map((l) => ({ ...l, status: invoice.status }))
+  if (paid) {
+    const labels = {
+      rep: 'Sales Rep',
+      manager: 'Sales Manager',
+      finance: 'Finance',
+      admin: 'Administrator',
+    }
+    invoice.paymentRecordedBy = {
+      name: user.name,
+      role: user.role,
+      roleLabel: labels[user.role] || user.role,
+    }
+  } else {
+    invoice.paymentRecordedBy = null
+  }
+  logActivity(`Invoice ${invoice.number} marked ${invoice.status} by ${user.name}`)
+  io.to('workspace').emit('workspace:updated', { type: 'invoice', id: invoice.id })
+  return invoice
+}
+
+app.post('/api/invoices/:id/record-payment', auth, requireRoles(['rep', 'manager', 'admin']), (req, res) => {
   const invoice = db.invoices.find((i) => i.id === req.params.id)
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
-  invoice.status = 'paid'
-  invoice.step = 'paid'
-  invoice.lines = invoice.lines.map((l) => ({ ...l, status: 'paid' }))
-  logActivity(`Invoice ${invoice.number} payment recorded by ${req.user.name}`)
-  io.to('workspace').emit('workspace:updated', { type: 'invoice', id: invoice.id })
-  res.json(invoice)
+  res.json(applyInvoiceStatus(invoice, 'paid', req.user))
+})
+
+app.post('/api/invoices/:id/status', auth, requireRoles(['rep', 'manager', 'admin']), (req, res) => {
+  const invoice = db.invoices.find((i) => i.id === req.params.id)
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
+  const status = req.body?.status === 'paid' ? 'paid' : 'unpaid'
+  res.json(applyInvoiceStatus(invoice, status, req.user))
 })
 
 app.get('/api/deal-health', auth, (_req, res) => {

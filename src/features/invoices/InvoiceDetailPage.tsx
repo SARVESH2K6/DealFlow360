@@ -1,14 +1,13 @@
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
-import { DataTable, type Column } from '../../components/ui/DataTable'
-import { InfoBanner } from '../../components/ui/InfoBanner'
+import { InvoiceDocument } from '../../components/ui/InvoiceDocument'
 import { ErrorState, Page, PageHeader, TableSkeleton } from '../../components/ui/Page'
 import { StatusStepper } from '../../components/ui/StatusStepper'
 import { useToast } from '../../components/ui/Toast'
-import { canRecordPayment, useAuth } from '../../lib/auth'
-import { formatDate, money } from '../../lib/format'
-import { useInvoiceDetail, useRecordPayment } from '../../lib/hooks'
-import type { InvoiceLine } from '../../lib/types'
+import { canSetInvoiceStatus, useAuth } from '../../lib/auth'
+import { downloadInvoicePdf } from '../../lib/invoicePdf'
+import { useInvoiceDetail, useSetInvoiceStatus } from '../../lib/hooks'
 
 const STEPS = ['Order Confirmed', 'Shipped', 'Invoiced', 'Paid']
 
@@ -24,7 +23,9 @@ export function InvoiceDetailPage() {
   const { user } = useAuth()
   const { push } = useToast()
   const { data, isLoading, isError, error } = useInvoiceDetail(id)
-  const pay = useRecordPayment(id ?? '')
+  const setStatus = useSetInvoiceStatus(id ?? '')
+  const [downloading, setDownloading] = useState(false)
+  const canSet = canSetInvoiceStatus(user?.role)
 
   if (isLoading) {
     return (
@@ -42,40 +43,62 @@ export function InvoiceDetailPage() {
     )
   }
 
-  const cols: Column<InvoiceLine>[] = [
-    { key: 'number', header: 'Invoice #' },
-    { key: 'amount', header: 'Amount', render: (r) => money(r.amount) },
-    { key: 'status', header: 'Status' },
-    { key: 'dueDate', header: 'Due Date', render: (r) => formatDate(r.dueDate) },
-  ]
-
   return (
     <Page>
-      <PageHeader title={`${data.number} · ${data.customerName}`} />
+      <PageHeader
+        kicker="Statement"
+        title={data.number}
+        actions={
+          <div className="flex items-center gap-3">
+            {canSet ? (
+              data.status === 'paid' ? (
+                <Button
+                  variant="secondary"
+                  loading={setStatus.isPending}
+                  onClick={async () => {
+                    await setStatus.mutateAsync('unpaid')
+                    push('Marked unpaid.')
+                  }}
+                >
+                  Mark unpaid
+                </Button>
+              ) : (
+                <Button
+                  variant="commit"
+                  loading={setStatus.isPending}
+                  onClick={async () => {
+                    await setStatus.mutateAsync('paid')
+                    push('Marked paid.', 'ok')
+                  }}
+                >
+                  Mark paid
+                </Button>
+              )
+            ) : (
+              <p className="max-w-[220px] text-right text-[12px] text-inkMuted">
+                Payment status is set by sales, not finance.
+              </p>
+            )}
+            <Button
+              variant="secondary"
+              loading={downloading}
+              onClick={() => {
+                setDownloading(true)
+                try {
+                  downloadInvoicePdf(data)
+                  push('Invoice downloaded.', 'ok')
+                } finally {
+                  setDownloading(false)
+                }
+              }}
+            >
+              Download PDF
+            </Button>
+          </div>
+        }
+      />
       <StatusStepper steps={STEPS} currentStep={stepIndex(data.step)} />
-      <DataTable columns={cols} rows={data.lines} rowKey={(r) => r.number} />
-      <InfoBanner>{data.note}</InfoBanner>
-      <div className="flex gap-2">
-        {canRecordPayment(user?.role) && data.status !== 'paid' ? (
-          <Button
-            variant="commit"
-            loading={pay.isPending}
-            onClick={async () => {
-              await pay.mutateAsync()
-              push('Payment recorded.', 'ok')
-            }}
-          >
-            Record Payment
-          </Button>
-        ) : null}
-        <Button
-          variant="secondary"
-          title="Coming soon"
-          disabled
-        >
-          Download Invoice
-        </Button>
-      </div>
+      <InvoiceDocument invoice={data} />
     </Page>
   )
 }

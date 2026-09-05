@@ -36,6 +36,18 @@ export function formatDateTime(iso: string): string {
   }).format(d)
 }
 
+export function roleLabel(role: string): string {
+  const map: Record<string, string> = {
+    rep: 'Sales Rep',
+    manager: 'Sales Manager',
+    finance: 'Finance',
+    admin: 'Administrator',
+    customer: 'Customer',
+    system: 'Within-limit auto-approval',
+  }
+  return map[role] ?? role
+}
+
 export function quotationStatusLabel(status: string): string {
   const map: Record<string, string> = {
     draft: 'Draft',
