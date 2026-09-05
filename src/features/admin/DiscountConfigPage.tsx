@@ -30,40 +30,24 @@ export function DiscountConfigPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Discount Tiers and Approval Chain"
-        actions={
-          canEdit ? (
-            <Button
-              variant="commit"
-              loading={save.isPending}
-              onClick={async () => {
-                await save.mutateAsync(config)
-                push('Configuration saved.', 'ok')
-              }}
-            >
-              Save Configuration
-            </Button>
-          ) : null
-        }
-      />
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section>
-          <h2 className="mb-2 font-serif text-[18px] text-ink">Tier discounts</h2>
+      <PageHeader title="Discount Tiers and Approval Chain" />
+      <div className="grid grid-cols-2 gap-4">
+        <section className="rounded-md border border-border bg-surface">
+          <h2 className="border-b border-border px-4 py-3 text-[15px] font-medium text-ink">Tier Discount Settings</h2>
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-bronze/40">
-                <th className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">Tier</th>
-                <th className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">Max Discount</th>
+              <tr className="h-9 bg-surfaceAlt">
+                <th className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Tier</th>
+                <th className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Max Discount</th>
               </tr>
             </thead>
             <tbody>
               {config.tierDiscounts.map((row, i) => (
-                <tr key={row.id} className="h-9 border-b border-ink/[0.08] last:border-0">
-                  <td className="pr-3 text-[13px]">{row.tier}</td>
-                  <td>
+                <tr key={row.id} className="h-11 border-b border-border last:border-0">
+                  <td className="px-3">{row.tier}</td>
+                  <td className="px-3">
                     <input
-                      className={inputCls('w-20')}
+                      className={inputCls('w-24')}
                       type="number"
                       disabled={!canEdit}
                       value={row.maxDiscount}
@@ -81,22 +65,22 @@ export function DiscountConfigPage() {
             </tbody>
           </table>
         </section>
-        <section>
-          <h2 className="mb-2 font-serif text-[18px] text-ink">Category ceilings</h2>
+        <section className="rounded-md border border-border bg-surface">
+          <h2 className="border-b border-border px-4 py-3 text-[15px] font-medium text-ink">Category Discount Ceilings</h2>
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-bronze/40">
-                <th className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">Category</th>
-                <th className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">Max Discount</th>
+              <tr className="h-9 bg-surfaceAlt">
+                <th className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Category</th>
+                <th className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Max Discount</th>
               </tr>
             </thead>
             <tbody>
               {config.categoryCeilings.map((row, i) => (
-                <tr key={row.id} className="h-9 border-b border-ink/[0.08] last:border-0">
-                  <td className="pr-3 text-[13px]">{row.category}</td>
-                  <td>
+                <tr key={row.id} className="h-11 border-b border-border last:border-0">
+                  <td className="px-3">{row.category}</td>
+                  <td className="px-3">
                     <input
-                      className={inputCls('w-20')}
+                      className={inputCls('w-24')}
                       type="number"
                       disabled={!canEdit}
                       value={row.maxDiscount}
@@ -114,52 +98,61 @@ export function DiscountConfigPage() {
             </tbody>
           </table>
         </section>
-        <section>
-          <h2 className="mb-2 font-serif text-[18px] text-ink">Approval chain</h2>
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-bronze/40">
-                <th className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">Range</th>
-                <th className="h-8 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted">Routing</th>
-              </tr>
-            </thead>
-            <tbody>
-              {config.approvalChain.map((row, i) => (
-                <tr key={row.id} className="h-9 border-b border-ink/[0.08] last:border-0">
-                  <td className="pr-3 text-[13px]">{row.range}</td>
-                  <td>
-                    <select
-                      className={inputCls()}
-                      disabled={!canEdit}
-                      value={row.routing}
-                      onChange={(e) => {
-                        const next = [...config.approvalChain]
-                        const cur = next[i]
-                        if (!cur) return
-                        next[i] = { ...cur, routing: e.target.value }
-                        setConfig({ ...config, approvalChain: next })
-                      }}
-                    >
-                      <option>No approval</option>
-                      <option>Sales Manager</option>
-                      <option>Sales Manager then Finance</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
       </div>
 
-      {!canEdit ? (
+      <section className="rounded-md border border-border bg-surface">
+        <h2 className="border-b border-border px-4 py-3 text-[15px] font-medium text-ink">
+          Discount Range → Max Discount
+        </h2>
+        <table className="w-full text-left">
+          <thead>
+            <tr className="h-9 bg-surfaceAlt">
+              <th className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Range</th>
+              <th className="px-3 text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Routing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {config.approvalChain.map((row, i) => (
+              <tr key={row.id} className="h-11 border-b border-border last:border-0">
+                <td className="px-3">{row.range}</td>
+                <td className="px-3">
+                  <input
+                    className={inputCls()}
+                    disabled={!canEdit}
+                    value={row.routing}
+                    onChange={(e) => {
+                      const next = [...config.approvalChain]
+                      const cur = next[i]
+                      if (!cur) return
+                      next[i] = { ...cur, routing: e.target.value }
+                      setConfig({ ...config, approvalChain: next })
+                    }}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {canEdit ? (
+        <Button
+          variant="commit"
+          loading={save.isPending}
+          onClick={async () => {
+            await save.mutateAsync(config)
+            push('Configuration saved.', 'ok')
+          }}
+        >
+          Save Configuration
+        </Button>
+      ) : (
         <p className="text-[13px] text-inkMuted">Finance has read access. Only admin can save changes.</p>
-      ) : null}
+      )}
 
       <InfoBanner>
-        When a quote crosses categories with different ceilings, the system computes a blended risk score and
-        routes using this approval chain: Within limit needs no approval, medium routes to Sales Manager, and high
-        routes to Sales Manager then Finance. Changing the routing values is what the risk engine uses.
+        When a quote crosses categories with different ceilings, the system computes a blended risk score and routes to
+        the highest required level. All approvals, rejections, and edits must be logged with user, timestamp, and reason.
       </InfoBanner>
     </Page>
   )

@@ -1,27 +1,17 @@
-import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { ErrorState, Page, PageHeader, SearchField, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { money } from '../../lib/format'
 import { useCreateProduct, useProductsList } from '../../lib/hooks'
-import { matchesSearch } from '../../lib/search'
 import type { Product } from '../../lib/types'
 
 export function ProductsListPage() {
   const { data, isLoading, isError, error } = useProductsList()
   const create = useCreateProduct()
   const navigate = useNavigate()
-  const [query, setQuery] = useState('')
-  const products = useMemo(
-    () =>
-      (data?.items ?? []).filter((p) =>
-        matchesSearch(query, [p.name, p.category, p.unit, p.status, String(p.price)]),
-      ),
-    [data?.items, query],
-  )
 
   const cols: Column<Product>[] = [
     { key: 'name', header: 'Product Name', sortable: true },
@@ -70,15 +60,14 @@ export function ProductsListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
         <>
-          <div className="grid grid-cols-3 gap-px bg-bronze/30">
+          <div className="grid grid-cols-3 gap-4">
             <StatCard label="Total Products" value={data.stats.totalProducts} />
             <StatCard label="Pricelists" value={data.stats.pricelists} />
             <StatCard label="Variants" value={data.stats.variants} />
           </div>
-          <SearchField value={query} onChange={setQuery} placeholder="Search products" />
           <DataTable
             columns={cols}
-            rows={products}
+            rows={data.items}
             rowKey={(r) => r.id}
             onRowClick={(r) => navigate(`/app/products/${r.id}`)}
             emptyMessage="No products yet."

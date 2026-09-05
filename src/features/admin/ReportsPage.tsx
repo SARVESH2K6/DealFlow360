@@ -10,8 +10,6 @@ export function ReportsPage() {
   const [status, setStatus] = useState('All')
   const [product, setProduct] = useState('All')
   const { data, isLoading, isError, error } = useReports({ period, team, status, product })
-  const teams = data?.options?.teams ?? ['North America', 'EMEA', 'APAC']
-  const products = data?.options?.products ?? ['Industrial Sensor Array', 'Predictive Maintenance Suite']
 
   return (
     <Page>
@@ -39,9 +37,8 @@ export function ReportsPage() {
         <Field label="Sales Team">
           <select className={inputCls()} value={team} onChange={(e) => setTeam(e.target.value)}>
             <option>All</option>
-            {teams.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
+            <option>North America</option>
+            <option>EMEA</option>
           </select>
         </Field>
         <Field label="Approval Status">
@@ -54,16 +51,15 @@ export function ReportsPage() {
         <Field label="Product">
           <select className={inputCls()} value={product} onChange={(e) => setProduct(e.target.value)}>
             <option>All</option>
-            {products.map((p) => (
-              <option key={p}>{p}</option>
-            ))}
+            <option>Industrial Sensor Array</option>
+            <option>Predictive Maintenance Suite</option>
           </select>
         </Field>
       </div>
       {isLoading ? <StatRowSkeleton /> : null}
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
-        <div className="grid grid-cols-3 gap-px bg-bronze/30">
+        <div className="grid grid-cols-3 gap-4">
           <StatCard label="Quotes Created" value={data.quotesCreated} />
           <StatCard label="Avg Approval Time" value={data.avgApprovalTime} />
           <StatCard label="Top Upsell Product" value={data.topUpsellProduct} />

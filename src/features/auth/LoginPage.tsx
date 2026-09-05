@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
+import { InfoBanner } from '../../components/ui/InfoBanner'
 import { Field, inputCls } from '../../components/ui/Page'
 import { isInternal, useAuth } from '../../lib/auth'
 import { ApiError } from '../../lib/api'
@@ -13,7 +14,6 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   if (user) {
@@ -23,7 +23,6 @@ export function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    setNotice(null)
     setLoading(true)
     try {
       const next = mode === 'login' ? await login(email, password) : await signup(email, password, name)
@@ -36,141 +35,84 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center overflow-hidden px-6">
-      <div className="w-full max-w-[380px] bg-sheet px-6 py-5 shadow-sheet">
+    <div className="flex min-h-screen items-center justify-center px-6 py-16">
+      <div className="w-full max-w-[420px] bg-sheet px-10 py-12 shadow-sheet">
         <div className="rule-double" />
-        <p className="mt-3 font-serif text-[18px] text-commit">DealFlow360</p>
-        <div className="relative mt-2 h-7 overflow-hidden">
-          <h1
-            className={`absolute inset-0 font-serif text-[24px] leading-tight text-ink transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              mode === 'login' ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
-            }`}
-            aria-hidden={mode !== 'login'}
-          >
-            Sign in
-          </h1>
-          <h1
-            className={`absolute inset-0 font-serif text-[24px] leading-tight text-ink transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              mode === 'signup' ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-            }`}
-            aria-hidden={mode !== 'signup'}
-          >
-            Open an account
-          </h1>
-        </div>
-        <p className="mt-1 text-[13px] text-inkMuted">Private operations ledger. Restricted access.</p>
+        <p className="mt-6 font-serif text-[22px] text-commit">DealFlow360</p>
+        <h1 className="mt-5 font-serif text-[34px] leading-tight text-ink">
+          {mode === 'login' ? 'Sign in' : 'Open an account'}
+        </h1>
+        <p className="mt-2 text-[14px] text-inkMuted">Private operations ledger. Restricted access.</p>
 
-        <div className="relative mt-4 grid grid-cols-2 border border-bronze/50">
-          <span
-            aria-hidden
-            className={`absolute inset-y-0 w-1/2 bg-ink transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              mode === 'signup' ? 'translate-x-full' : 'translate-x-0'
-            }`}
-          />
+        <div className="mt-8 flex gap-8 border-b border-bronze/40">
           <button
             type="button"
-            onClick={() => {
-              setMode('login')
-              setError(null)
-              setNotice(null)
-            }}
-            className={`relative z-10 h-8 text-[11px] uppercase tracking-[0.14em] transition-colors duration-300 ${
-              mode === 'login' ? 'text-sheet' : 'text-inkMuted hover:text-ink'
-            }`}
+            onClick={() => setMode('login')}
+            className={`pb-2 text-[12px] uppercase tracking-[0.14em] ${mode === 'login' ? 'border-b-2 border-ink text-ink' : 'text-inkMuted'}`}
           >
             Log In
           </button>
           <button
             type="button"
-            onClick={() => {
-              setMode('signup')
-              setError(null)
-              setNotice(null)
-            }}
-            className={`relative z-10 h-8 text-[11px] uppercase tracking-[0.14em] transition-colors duration-300 ${
-              mode === 'signup' ? 'text-sheet' : 'text-inkMuted hover:text-ink'
-            }`}
+            onClick={() => setMode('signup')}
+            className={`pb-2 text-[12px] uppercase tracking-[0.14em] ${mode === 'signup' ? 'border-b-2 border-ink text-ink' : 'text-inkMuted'}`}
           >
             Sign Up
           </button>
         </div>
 
-        <form className="mt-4" onSubmit={onSubmit}>
-          <div
-            className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              mode === 'signup' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-            }`}
-          >
-            <div className="overflow-hidden">
-              <div
-                className={`pb-3 transition-opacity duration-300 ${
-                  mode === 'signup' ? 'opacity-100' : 'opacity-0'
-                }`}
-              >
-                <Field label="Name">
-                  <input
-                    className={inputCls()}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    tabIndex={mode === 'signup' ? 0 : -1}
-                    autoComplete="name"
-                  />
-                </Field>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <Field label="Email">
-              <input
-                className={inputCls()}
-                type="email"
-                autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+        <form className="mt-8 space-y-5" onSubmit={onSubmit}>
+          {mode === 'signup' ? (
+            <Field label="Name">
+              <input className={inputCls()} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
-            <Field label="Password">
-              <input
-                className={inputCls()}
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </Field>
-            {error ? <p className="text-[13px] text-danger">{error}</p> : null}
-            {notice ? <p className="text-[13px] text-inkMuted">{notice}</p> : null}
-            <Button type="submit" variant="commit" className="w-full" loading={loading}>
-              {mode === 'login' ? 'Log In' : 'Create account'}
-            </Button>
-          </div>
+          ) : null}
+          <Field label="Email">
+            <input
+              className={inputCls()}
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Password">
+            <input
+              className={inputCls()}
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </Field>
+          {error ? <p className="text-[13px] text-danger">{error}</p> : null}
+          <Button type="submit" variant="commit" className="w-full" loading={loading}>
+            {mode === 'login' ? 'Log In' : 'Create account'}
+          </Button>
         </form>
 
-        <div className="relative mt-3 min-h-[2.5rem]">
+        {mode === 'login' ? (
           <button
             type="button"
-            className={`absolute inset-x-0 top-0 text-left text-[13px] text-inkMuted transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink ${
-              mode === 'login' ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
-            }`}
-            onClick={() =>
-              setNotice('Forgot Password is a stub. Contact your administrator to reset a password.')
-            }
-            tabIndex={mode === 'login' ? 0 : -1}
+            className="mt-5 text-[13px] text-inkMuted hover:text-ink"
+            onClick={() => setError('Contact your administrator to reset a password.')}
           >
             Forgot Password?
           </button>
-          <p
-            className={`absolute inset-x-0 top-0 text-[12px] leading-snug text-inkMuted transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              mode === 'signup' ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'
-            }`}
-          >
+        ) : (
+          <p className="mt-5 text-[13px] text-inkMuted">
             Sign-up creates a customer portal account only. Internal roles are seeded by an administrator.
           </p>
-        </div>
+        )}
 
-        <p className="mt-4 text-[10px] font-medium uppercase tracking-[0.12em] text-inkFaint">
+        <div className="mt-10">
+          <InfoBanner>
+            After login, internal users land on the ledger. Customers land on their quotation portal.
+          </InfoBanner>
+        </div>
+        <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.12em] text-inkFaint">
           Demo: ivan.p@example.net · olivia.t@example.org · marco.r@example.org / password
         </p>
       </div>

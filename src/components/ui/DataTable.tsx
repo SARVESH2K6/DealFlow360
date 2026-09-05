@@ -59,14 +59,15 @@ export function DataTable<T>({
 
   return (
     <div className="w-full">
+      <div className="rule-double mb-1" />
       <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="border-b border-bronze/40">
+          <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 onClick={() => onHeader(col)}
-                className={`h-8 pr-4 text-[10px] font-medium uppercase tracking-[0.12em] text-inkMuted ${col.sortable ? 'cursor-pointer select-none' : ''} ${col.align === 'right' ? 'text-right' : ''} ${col.className ?? ''}`}
+                className={`h-11 pr-6 text-[10px] font-medium uppercase tracking-[0.14em] text-inkMuted ${col.sortable ? 'cursor-pointer select-none' : ''} ${col.align === 'right' ? 'text-right' : ''} ${col.className ?? ''}`}
               >
                 {col.header}
                 {sortKey === col.key ? (dir === 'asc' ? ' ↑' : ' ↓') : ''}
@@ -84,7 +85,7 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={`h-9 pr-4 text-[13px] text-ink ${col.align === 'right' ? 'text-right font-serif text-[15px] tabular-nums' : ''} ${col.className ?? ''}`}
+                  className={`h-14 pr-6 text-[14px] text-ink ${col.align === 'right' ? 'text-right font-serif text-[17px] tabular-nums' : ''} ${col.className ?? ''}`}
                 >
                   {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}
                 </td>
@@ -93,6 +94,7 @@ export function DataTable<T>({
           ))}
         </tbody>
       </table>
+      <div className="rule-double mt-1" />
     </div>
   )
 }

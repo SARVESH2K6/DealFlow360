@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { InfoBanner } from '../../components/ui/InfoBanner'
-import { ErrorState, Field, Page, PageHeader, TableSkeleton, inputCls } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, TableSkeleton } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/Toast'
 import { formatDate, money } from '../../lib/format'
 import { useSubscriptionAction, useSubscriptionDetail } from '../../lib/hooks'
@@ -15,21 +14,6 @@ export function SubscriptionDetailPage() {
   const { push } = useToast()
   const { data, isLoading, isError, error } = useSubscriptionDetail(id)
   const action = useSubscriptionAction(id ?? '')
-  const [editing, setEditing] = useState(false)
-  const [plan, setPlan] = useState('')
-  const [cycle, setCycle] = useState('annual')
-  const [amount, setAmount] = useState(0)
-  const [status, setStatus] = useState<'active' | 'paused' | 'cancelled'>('active')
-  const [nextBill, setNextBill] = useState('')
-
-  useEffect(() => {
-    if (!data) return
-    setPlan(data.plan)
-    setCycle(data.cycle)
-    setAmount(data.amount)
-    setStatus(data.status)
-    setNextBill(data.nextBill.slice(0, 10))
-  }, [data])
 
   if (isLoading) {
     return (
@@ -65,84 +49,42 @@ export function SubscriptionDetailPage() {
         title={`${data.customerName} · ${data.plan}`}
         actions={<Badge status={data.status}>{data.status}</Badge>}
       />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section>
-          <h2 className="mb-2 font-serif text-[18px] text-ink">One-time lines</h2>
-          <DataTable columns={oneTimeCols} rows={data.oneTimeLines} rowKey={(r) => r.productName} emptyMessage="No one-time lines." />
-        </section>
-        <section>
-          <h2 className="mb-2 font-serif text-[18px] text-ink">Recurring lines</h2>
-          <DataTable columns={recCols} rows={data.recurringLines} rowKey={(r) => r.plan} emptyMessage="No recurring lines." />
-        </section>
-      </div>
+      <section>
+        <h2 className="mb-3 text-[15px] font-medium text-ink">One-Time Lines (from originating order)</h2>
+        <DataTable columns={oneTimeCols} rows={data.oneTimeLines} rowKey={(r) => r.productName} emptyMessage="No one-time lines." />
+      </section>
+      <section>
+        <h2 className="mb-3 text-[15px] font-medium text-ink">Recurring Lines</h2>
+        <DataTable columns={recCols} rows={data.recurringLines} rowKey={(r) => r.plan} emptyMessage="No recurring lines." />
+      </section>
       <InfoBanner>
         Recurring lines are invoiced at the start of each billing period, independently of one-time hardware on the originating order.
       </InfoBanner>
-      {editing ? (
-        <div className="grid grid-cols-2 gap-4 border border-border bg-surface p-4 md:grid-cols-4">
-          <Field label="Plan">
-            <input className={inputCls()} value={plan} onChange={(e) => setPlan(e.target.value)} />
-          </Field>
-          <Field label="Cycle">
-            <select className={inputCls()} value={cycle} onChange={(e) => setCycle(e.target.value)}>
-              <option value="monthly">monthly</option>
-              <option value="quarterly">quarterly</option>
-              <option value="annual">annual</option>
-            </select>
-          </Field>
-          <Field label="Amount">
-            <input className={inputCls()} type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
-          </Field>
-          <Field label="Status">
-            <select
-              className={inputCls()}
-              value={status}
-              onChange={(e) => setStatus(e.target.value as 'active' | 'paused' | 'cancelled')}
-            >
-              <option value="active">active</option>
-              <option value="paused">paused</option>
-            </select>
-          </Field>
-          <Field label="Next bill">
-            <input className={inputCls()} type="date" value={nextBill} onChange={(e) => setNextBill(e.target.value)} />
-          </Field>
-          <div className="flex items-end gap-2">
-            <Button
-              variant="commit"
-              loading={action.isPending && action.variables?.action === 'modify'}
-              onClick={async () => {
-                await action.mutateAsync({
-                  action: 'modify',
-                  body: { plan, cycle, amount, status, nextBill },
-                })
-                setEditing(false)
-                push('Subscription updated.', 'ok')
-              }}
-            >
-              Save changes
-            </Button>
-            <Button variant="ghost" onClick={() => setEditing(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setEditing(true)}>
-            Modify Subscription
-          </Button>
-          <Button
-            variant="danger"
-            loading={action.isPending && action.variables?.action === 'cancel'}
-            onClick={async () => {
-              await action.mutateAsync({ action: 'cancel' })
-              push('Subscription cancelled.', 'danger')
-            }}
-          >
-            Cancel Subscription
-          </Button>
-        </div>
-      )}
+      <div className="flex gap-2">
+        <Button
+          variant="secondary"
+          loading={action.isPending && action.variables?.action === 'modify'}
+          onClick={async () => {
+            await action.mutateAsync({
+              action: 'modify',
+              body: { status: data.status === 'paused' ? 'active' : 'paused' },
+            })
+            push('Subscription updated.', 'ok')
+          }}
+        >
+          Modify Subscription
+        </Button>
+        <Button
+          variant="danger"
+          loading={action.isPending && action.variables?.action === 'cancel'}
+          onClick={async () => {
+            await action.mutateAsync({ action: 'cancel' })
+            push('Subscription cancelled.', 'danger')
+          }}
+        >
+          Cancel Subscription
+        </Button>
+      </div>
     </Page>
   )
 }

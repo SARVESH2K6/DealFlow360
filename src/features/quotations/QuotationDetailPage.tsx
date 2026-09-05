@@ -99,13 +99,13 @@ export function QuotationDetailPage() {
     )
   }
 
-  const editable = ['draft', 'rejected', 'negotiation'].includes(data.status)
+  const editable = data.status === 'draft' || data.status === 'rejected'
 
   async function onSubmit() {
     const result = await submit.mutateAsync()
     push(`Risk score ${result.riskScore} (${result.riskLevel}).`, result.riskLevel === 'HIGH' ? 'warn' : 'ok')
     if (result.approvalRequired) navigate(`/app/approvals/${result.approvalId}`)
-    else navigate('/app/quotations')
+    else navigate('/app/fulfillment')
   }
 
   return (
@@ -264,7 +264,7 @@ export function QuotationDetailPage() {
           loading={submit.isPending}
           onClick={() => void onSubmit()}
         >
-          Submit Quote
+          Submit for approval
         </Button>
       </div>
     </Page>

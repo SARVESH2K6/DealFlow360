@@ -18,9 +18,9 @@ const styles: Record<BadgeStatus, string> = {
   high: 'bg-dangerBg text-danger',
   cancelled: 'bg-dangerBg text-danger',
   draft: 'bg-cream text-inkMuted',
-  returned: 'bg-dangerBg text-danger',
   negotiating: 'bg-warnBg text-warn',
   under_negotiation: 'bg-warnBg text-warn',
+  returned: 'bg-warnBg text-warn',
 }
 
 const labels: Partial<Record<BadgeStatus, string>> = {
@@ -30,12 +30,12 @@ const labels: Partial<Record<BadgeStatus, string>> = {
   approved: 'Approved',
   rejected: 'Rejected',
   draft: 'Draft',
-  returned: 'Returned',
   negotiating: 'Negotiation',
   confirmed: 'Confirmed',
   low: 'Low',
   medium: 'Medium',
   high: 'High',
+  returned: 'Returned',
 }
 
 interface BadgeProps {

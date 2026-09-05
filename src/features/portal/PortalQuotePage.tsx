@@ -110,7 +110,7 @@ export function PortalQuotePage() {
       </Field>
 
       <InfoBanner>
-        Once confirmed, the order will be sent for fulfillment.
+        If final terms exceed thresholds, the quote automatically re-enters approval.
       </InfoBanner>
 
       <div className="flex gap-2">
@@ -134,8 +134,13 @@ export function PortalQuotePage() {
           disabled={locked}
           loading={confirm.isPending}
           onClick={async () => {
-            await confirm.mutateAsync()
-            push('Quotation confirmed.', 'ok')
+            const result = await confirm.mutateAsync()
+            push(
+              result.reenteredApproval
+                ? 'Terms exceeded thresholds — quote re-entered approval.'
+                : 'Quotation confirmed.',
+              result.reenteredApproval ? 'warn' : 'ok',
+            )
           }}
         >
           Confirm Quotation

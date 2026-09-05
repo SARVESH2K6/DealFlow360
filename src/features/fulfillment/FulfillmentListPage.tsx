@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { InfoBanner } from '../../components/ui/InfoBanner'
-import { ErrorState, Page, PageHeader, SearchField, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, TableSkeleton } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/Toast'
 import { quotationStatusLabel } from '../../lib/format'
 import { useFulfillment, useConsolidateFulfillment } from '../../lib/hooks'
@@ -62,7 +62,7 @@ export function FulfillmentListPage() {
       {data ? (
         <>
           {firstPrompt ? (
-            <div className="flex items-center justify-between gap-6 border-l-[3px] border-warn bg-warnBg/40 px-4 py-3">
+            <div className="mb-6 flex items-center justify-between gap-6 border-l-[3px] border-warn bg-warnBg/40 px-4 py-3">
               <p className="text-[13px] leading-relaxed text-warn">
                 Stock has arrived for {firstPrompt.orderNumber}. Consolidate remaining backorder
                 {firstPrompt.remainingQty ? ` (${firstPrompt.remainingQty} units)` : ''}?
@@ -78,12 +78,16 @@ export function FulfillmentListPage() {
                 Consolidate Remaining Backorder
               </Button>
             </div>
-          ) : (
-            <InfoBanner>
-              A Consolidate Remaining Backorder prompt appears automatically once stock arrives for a backorder.
-            </InfoBanner>
-          )}
-          <SearchField value={query} onChange={setQuery} placeholder="Search stock or orders" />
+          ) : null}
+          <div className="mb-6">
+            <input
+              type="text"
+              placeholder="Search stock or orders..."
+              className="h-9 w-full max-w-sm rounded-none border-0 border-b border-bronze/40 bg-transparent px-0 text-[13px] text-ink placeholder:text-inkFaint focus:border-ink focus:outline-none"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
           <section>
             <h2 className="mb-3 text-[15px] font-medium text-ink">Live stock</h2>
             <DataTable columns={stockCols} rows={stock} rowKey={(r) => r.warehouse + r.productId} emptyMessage="No stock rows." />
@@ -98,6 +102,9 @@ export function FulfillmentListPage() {
               emptyMessage="No orders awaiting fulfillment."
             />
           </section>
+          <InfoBanner>
+            &apos;Consolidate Remaining Backorder&apos; prompt appears automatically once stock arrives.
+          </InfoBanner>
         </>
       ) : null}
     </Page>

@@ -1,4 +1,3 @@
-import { LogOut } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   canSeeApprovals,
@@ -21,7 +20,7 @@ interface Tab {
 
 function tabsForInternal(role: Role | undefined): Tab[] {
   const tabs: Tab[] = [
-    { to: '/app/dashboard', label: 'Dashboard' },
+    { to: '/app/dashboard', label: 'Portfolio' },
     { to: '/app/quotations', label: 'Quotations' },
   ]
   if (canSeeApprovals(role)) tabs.push({ to: '/app/approvals', label: 'Approvals' })
@@ -40,7 +39,7 @@ function tabsForInternal(role: Role | undefined): Tab[] {
 }
 
 const portalTabs: Tab[] = [
-  { to: '/portal/quotes', label: 'Quotes' },
+  { to: '/portal/quotes', label: 'My Quotations' },
   { to: '/portal/messages', label: 'Messages' },
   { to: '/portal/profile', label: 'Profile' },
 ]
@@ -53,16 +52,16 @@ export function TopNav({ role }: TopNavProps) {
   return (
     <header className="sticky top-0 z-20 bg-sheet">
       <div className="rule-double" />
-      <div className="flex h-12 items-center justify-between px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-6">
-          <span className="shrink-0 font-serif text-[18px] tracking-tight text-commit">DealFlow360</span>
-          <nav className="flex items-center gap-5 overflow-x-auto">
+      <div className="flex h-16 items-center justify-between px-10">
+        <div className="flex items-center gap-10">
+          <span className="font-serif text-[20px] tracking-tight text-commit">DealFlow360</span>
+          <nav className="flex items-center gap-7">
             {tabs.map((tab) => (
               <NavLink
                 key={tab.to}
                 to={tab.to}
                 className={({ isActive }) =>
-                  `whitespace-nowrap text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 ${
+                  `text-[12px] uppercase tracking-[0.12em] transition-colors duration-150 ${
                     isActive ? 'text-ink' : 'text-inkMuted hover:text-ink'
                   }`
                 }
@@ -81,13 +80,12 @@ export function TopNav({ role }: TopNavProps) {
           </span>
           <button
             type="button"
-            className="inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.12em] text-inkMuted transition-colors duration-150 hover:text-ink"
+            className="text-[12px] uppercase tracking-[0.12em] text-inkMuted transition-colors duration-150 hover:text-ink"
             onClick={() => {
               logout()
               navigate('/login')
             }}
           >
-            <LogOut className="h-4 w-4" strokeWidth={1.5} aria-hidden />
             Log out
           </button>
         </div>

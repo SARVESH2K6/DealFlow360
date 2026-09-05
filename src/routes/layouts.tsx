@@ -8,8 +8,8 @@ function Shell({ role, children }: { role: 'internal' | 'portal'; children: Reac
   return (
     <div className="min-h-screen bg-paper">
       <TopNav role={role} />
-      <main className="px-5 py-4 lg:px-8">
-        <article className="mx-auto max-w-[1240px] bg-sheet px-6 py-5 shadow-sheet sm:px-8">{children}</article>
+      <main className="px-6 py-8 lg:px-10">
+        <article className="mx-auto max-w-[1180px] bg-sheet px-8 py-10 shadow-sheet sm:px-12">{children}</article>
       </main>
     </div>
   )
