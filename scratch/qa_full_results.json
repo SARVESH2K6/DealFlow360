@@ -1,0 +1,280 @@
+{
+  "at": "2026-09-06T00:05:00.416Z",
+  "api": "http://localhost:3001",
+  "ui": "http://localhost:5173",
+  "findings": [
+    {
+      "sev": "LOW",
+      "module": "Authentication & Roles",
+      "title": "Forgot Password is a stub with no reset flow",
+      "steps": [
+        "Click Forgot Password?"
+      ],
+      "expected": "Working reset or hide the control for the demo",
+      "actual": "Notice: Forgot Password is a stub…",
+      "screen": "/login",
+      "cause": "LoginPage setNotice stub"
+    },
+    {
+      "sev": "MEDIUM",
+      "module": "Authentication & Roles",
+      "title": "Signup succeeds with an empty name",
+      "steps": [
+        "Switch to Sign Up",
+        "Fill email+password only",
+        "Create account"
+      ],
+      "expected": "Name required",
+      "actual": "Landed http://localhost:5173/portal/quotes",
+      "screen": "/login signup",
+      "cause": "Name input has no required; createCustomerUser accepts empty name"
+    },
+    {
+      "sev": "MEDIUM",
+      "module": "Quotation Builder",
+      "title": "Quotations list has no Returned/Rejected filter chips",
+      "steps": [
+        "Open /app/quotations as rep"
+      ],
+      "expected": "Filter for returned and rejected (status exists in the model)",
+      "actual": "Only Draft / Pending Approval / Approved / Negotiation / Confirmed",
+      "screen": "/app/quotations",
+      "cause": "FILTERS in QuotationsListPage omits returned/rejected"
+    },
+    {
+      "sev": "MEDIUM",
+      "module": "Quotation Builder",
+      "title": "Negative discount in the UI is silently clamped, not rejected",
+      "steps": [
+        "Type -5 in Discount on a draft line"
+      ],
+      "expected": "Validation error",
+      "actual": "input became 0 with no error message",
+      "screen": "/app/quotations/:id",
+      "cause": "DebouncedNumberCell min={0}"
+    },
+    {
+      "sev": "HIGH",
+      "module": "Discount Tier & Approval Chain configuration screen",
+      "title": "Config screen claims routing values drive the engine; backend ignores them",
+      "steps": [
+        "Open Config as finance/admin",
+        "Read the info banner"
+      ],
+      "expected": "Copy matches requiredApprovalLevel(LOW/MEDIUM/HIGH) mapping",
+      "actual": "Banner: \"Changing the routing values is what the risk engine uses\"",
+      "screen": "/app/admin/discount-config",
+      "cause": "DiscountConfigPage InfoBanner vs helpers.requiredApprovalLevel never reading approvalChain"
+    },
+    {
+      "sev": "HIGH",
+      "module": "Warehouse Fulfillment & Split logic",
+      "title": "Consolidate Remaining Backorder button is shown but the API route 404s",
+      "steps": [
+        "Finance opens a fulfillment with canConsolidate",
+        "Click Consolidate Remaining Backorder"
+      ],
+      "expected": "Consolidation succeeds",
+      "actual": "UI offers the action; POST /api/fulfillment/:id/consolidate is 404 on Postgres",
+      "screen": "/app/fulfillment/:id",
+      "cause": "FulfillmentDetailPage vs missing index.pg.js route"
+    },
+    {
+      "sev": "MEDIUM",
+      "module": "Authentication & Roles",
+      "title": "Admin nav missing Product/Reports/Config",
+      "steps": [
+        "Login as beth.t@example.com"
+      ],
+      "expected": "All admin tabs",
+      "actual": "DASHBOARD QUOTATIONS APPROVALS FULFILLMENT SUBSCRIPTIONS INVOICES DEAL HEALTH REPORTS PRODUCT CONFIG",
+      "screen": "TopNav",
+      "cause": "tabsForInternal"
+    },
+    {
+      "sev": "HIGH",
+      "module": "Customer Portal Negotiation screen",
+      "title": "Create Request button never renders on My Quotations",
+      "steps": [
+        "Login as customer",
+        "View /portal/quotes"
+      ],
+      "expected": "Create Request in the page header",
+      "actual": "Button absent",
+      "screen": "/portal/quotes",
+      "cause": "PortalQuotesListPage passes PageHeader action= but PageHeader only reads actions="
+    },
+    {
+      "sev": "HIGH",
+      "module": "Customer Portal Negotiation screen",
+      "title": "Portal quote detail missing negotiate/confirm actions",
+      "steps": [
+        "Open a portal quote"
+      ],
+      "expected": "Submit Request + Confirm",
+      "actual": "Q-1064 · Acme Corp\nUNDER NEGOTIATION\nPRODUCT\tQTY\tPRICE\tOFFERED DISCOUNT\tCOMMENT\tCOUNTER DISCOUNT %\nIndustrial Sensor Array\t1\t$12,500.00\t45%\t\t\nREQUESTED DELIVERY DATE\n\nOnce confirmed, the order will be sent for fulfillment.\n\nSUBMIT REQUEST\nCONFIRM QUOTATION",
+      "screen": "/portal/quote/:id",
+      "cause": "PortalQuotePage"
+    },
+    {
+      "sev": "HIGH",
+      "module": "Real-time sync between internal workspace and customer portal",
+      "title": "Dashboard does not live-update when a customer negotiates",
+      "steps": [
+        "Manager stays on Dashboard",
+        "Customer submits a counter"
+      ],
+      "expected": "Badge/notification or deal row update",
+      "actual": "No \"41\" on dashboard after 5s. useDashboard has no useOrderSync. dashStillHasDeals=false",
+      "screen": "/app/dashboard",
+      "cause": "useDashboard is a plain useQuery with no socket/poll"
+    }
+  ],
+  "notes": [
+    {
+      "kind": "pass",
+      "title": "Empty login blocked by HTML required",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Wrong password shows UI error",
+      "extra": "Invalid email or password"
+    },
+    {
+      "kind": "pass",
+      "title": "Rep nav hides Approvals/Reports/Product/Config",
+      "extra": "DASHBOARD QUOTATIONS FULFILLMENT SUBSCRIPTIONS INVOICES"
+    },
+    {
+      "kind": "pass",
+      "title": "Rep /app/approvals redirected by RequireRole",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Rep blocked from discount config page",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Empty line-item state renders",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Submit disabled with zero lines",
+      "extra": ""
+    },
+    {
+      "kind": "info",
+      "title": "UI at ceiling",
+      "extra": "RISK STANDING\n0\nLOW\n\nQ-1067\n\n3k it solutions\n\n$15,300\n\nTerms\nCustomer\n3k it solution | near | low | low | Risk factor\nWithin limit\nPOST A PRODUCT\nSelect…\n24/7 Support Retainer\nEdge Gateway P | over | High"
+    },
+    {
+      "kind": "info",
+      "title": "UI just over ceiling",
+      "extra": "LOW | low | low | Within limit | High"
+    },
+    {
+      "kind": "info",
+      "title": "Dashboard vs API",
+      "extra": "uiHasSalesDashboard=true dealsApi=5"
+    },
+    {
+      "kind": "pass",
+      "title": "Dashboard renders",
+      "extra": "deals in API=5"
+    },
+    {
+      "kind": "pass",
+      "title": "401 redirects to login",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Manager sees Approvals tab",
+      "extra": ""
+    },
+    {
+      "kind": "info",
+      "title": "Fresh pending for manager UI",
+      "extra": "{\"id\":\"q-mtp1uoam-xyoj\",\"aid\":\"a-mtp1uocl-gu21\",\"req\":true,\"status\":\"pending_approval\"}"
+    },
+    {
+      "kind": "info",
+      "title": "Manager approval detail",
+      "extra": "hasApprove=1 snippet=Q-1068 · Acme Corp\nPENDING\nHIGH\nBLENDED RISK\nScore 74 · 7 blended\nGold\nCUSTOMER TIER\n$9,750\n\nWhy this quote was flagged\n\nLINE\tDISCOUNT GIVEN\tLIMIT ALLOWED\tOVER BY\nIndustrial Sensor Array\t22%\t15%\t7 pts\nLine items\nPRODUCT\tQTY\tPRICE\tDISCOUNT %\tLIMIT\tSTATUS\nIndustrial Sensor Array\t1\t$12,500\t22%\t15%\tover\nSUBMITTED\nSALES MANAGER\nFINANCE\nCONFIRMED\nAudit log\nUSER\tACTION\tDATE\tNOTE\nAlex Rivera\tSubmitted\t6 S"
+    },
+    {
+      "kind": "pass",
+      "title": "Manager sees Approve on pending sales_manager step",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Deal Health page renders",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Manager cannot open discount config (finance/admin only)",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Finance sees read-only discount config",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Invoices page renders",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Admin can create subscription plans in UI",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Customer lands on portal",
+      "extra": "http://localhost:5173/portal/quotes"
+    },
+    {
+      "kind": "pass",
+      "title": "Customer blocked from /app/dashboard",
+      "extra": ""
+    },
+    {
+      "kind": "info",
+      "title": "Portal counter allows",
+      "extra": "-8"
+    },
+    {
+      "kind": "pass",
+      "title": "Two-device: manager approval updated after customer counter",
+      "extra": "approvalId=a-mtp1v2gk-k7rt quote=q-mtp1v2ee-8nok appeared33=true managerBeforeHas22=true afterHas33=true afterHasNegotiation=true"
+    },
+    {
+      "kind": "pass",
+      "title": "Two tabs same approval scores match",
+      "extra": "100=100"
+    },
+    {
+      "kind": "pass",
+      "title": "F5 on approval detail reloads",
+      "extra": ""
+    },
+    {
+      "kind": "pass",
+      "title": "Logged-out deep link to /app redirects to login",
+      "extra": ""
+    }
+  ],
+  "sync": {
+    "pass": true,
+    "detail": "approvalId=a-mtp1v2gk-k7rt quote=q-mtp1v2ee-8nok appeared33=true managerBeforeHas22=true afterHas33=true afterHasNegotiation=true"
+  },
+  "pageErrors": []
+}

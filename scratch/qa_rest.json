@@ -1,0 +1,117 @@
+{
+  "out": [
+    {
+      "path": "/app/products",
+      "heading": [
+        "Products",
+        "+ NEW PRODUCT",
+        "6",
+        "TOTAL PRODUCTS",
+        "2",
+        "PRICELISTS",
+        "4",
+        "VARIANTS"
+      ],
+      "hasError": false,
+      "len": 450
+    },
+    {
+      "path": "/app/reports",
+      "heading": [
+        "Reports",
+        "EXPORT PDF",
+        "EXPORT XLS",
+        "PERIOD",
+        "Q3 2026",
+        "Q2 2026",
+        "YTD",
+        "SALES TEAM"
+      ],
+      "hasError": false,
+      "len": 285
+    },
+    {
+      "path": "/app/invoices",
+      "heading": [
+        "Invoices",
+        "2",
+        "UNPAID",
+        "2",
+        "PAID",
+        "INVOICE #\tCUSTOMER\tAMOUNT\tSTATUS\tDUE DATE",
+        "INV-2201\tStark Manufacturing\t$98,256\tUNPAID\t20 Sept 2026",
+        "INV-2194\tInitech\t$20,160\tUNPAID\t2 Sept 2026"
+      ],
+      "hasError": false,
+      "len": 262
+    },
+    {
+      "path": "/app/subscriptions",
+      "heading": [
+        "Subscriptions",
+        "NEW PLAN (ADMIN)",
+        "1",
+        "ACTIVE",
+        "1",
+        "PAUSED",
+        "2",
+        "CANCELLED"
+      ],
+      "hasError": false,
+      "len": 360
+    },
+    {
+      "path": "http://localhost:5173/app/invoices/inv-2201",
+      "invoiceDetail": "STATEMENT\n\nINV-2201\nMARK PAID\nDOWNLOAD PDF\nORDER CONFIRMED\nSHIPPED\nINVOICED\nPAID\n\nBILL TO\n\nStark Manufacturing\n\nNorth America · Net 30\n\nBALANCE DUE\n\n$98,256.00\n\nISSUED\n21 Aug 2026\nDUE\n20 Sept 2026\nTERMS\nNet 30\nSTATUS\nUnpaid\nCharges\nDESCRIPTION\nQTY\nRATE\nAMOUNT\nEdge Gateway Pro\n8\n$8,900.00\n$71,200.00\nCommitted remainder — site install\n1\n$27,056.00\n$27,056.00\nAmount due\n$98,256.00\n\nPartial delivery: 8 of 12 gateways shipped from East DC. Remainder on split shipment — invoice reflects shipped quanti"
+    },
+    {
+      "path": "http://localhost:5173/app/subscriptions/s-2",
+      "subDetail": "Acme Corp · 24/7 Support Retainer\nCANCELLED\nOne-time lines\nPRODUCT\tQTY\tAMOUNT\nIndustrial Sensor Array\t8\t$84,000\nRecurring lines\nPLAN\tCYCLE\tNEXT BILL DATE\tAMOUNT\n24/7 Support Retainer\tannual\t15 Nov 2026\t$16,200\n\nRecurring lines are invoiced at the start of each billing period, independently of one-time hardware on the originating order.\n\nMODIFY SUBSCRIPTION\nCANCEL SUBSCRIPTION",
+      "hasOneTime": true,
+      "hasRecurring": true
+    },
+    {
+      "quotations": "Quotations\nNEW QUOTATION\n12\nDRAFT\n$128,644\n2\nPENDING APPROVAL\n$96,000\n3\nAPPROVED\n$64,825\n3\nNEGOTIATION\n$73,250\n2\nCONFIRMED\n$157,851\nID\tDEAL NAME\tDATE\tVALUE\tREP\tSTATUS\nQ-1070\t3k it solutions\t6 Sept 202"
+    },
+    {
+      "messages": "Messages\nRiley Hart\n4 Sept, 14:42\n\nCan you move delivery to mid-October and improve the sensor discount?\n\nAlex Rivera\n4 Sept, 15:42\n\nLogged. Pricing is with our sales manager - you will see an updated quote shortly.\n\nRiley Hart\n6 Sept, 05:12\n\nqa-neg\n\nRiley Hart\n6 Sept, 05:27\n\nQA negotiate on pending"
+    },
+    {
+      "profile": "Profile\n\nNAME\n\nRiley Hart\n\nEMAIL\n\nmarco.r@example.org\n\nCOMPANY\n\nAcme Corp\n\nTIER\n\nGold\n\nTERMS\n\nNet 30"
+    }
+  ],
+  "pageErrors": [],
+  "subApi": {
+    "id": "s-2",
+    "oneTime": [
+      {
+        "productName": "Industrial Sensor Array",
+        "qty": 8,
+        "amount": 84000
+      }
+    ],
+    "recurring": [
+      {
+        "plan": "24/7 Support Retainer",
+        "cycle": "annual",
+        "nextBillDate": "2026-11-15",
+        "amount": 16200
+      }
+    ],
+    "keys": [
+      "id",
+      "customerId",
+      "customerName",
+      "plan",
+      "cycle",
+      "nextBill",
+      "amount",
+      "status",
+      "originatingOrderId",
+      "oneTimeLines",
+      "recurringLines"
+    ]
+  },
+  "invCount": 4,
+  "subCount": 4
+}

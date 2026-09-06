@@ -1,7 +1,9 @@
+import '../loadEnv.js'
 import pg from 'pg'
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:Moksh2124@localhost:5432/dealflow360',
+  connectionString:
+    process.env.DATABASE_URL || 'postgresql://postgres:Moksh2124@127.0.0.1:5432/dealflow360',
 })
 
 pool.on('error', (err) => {

@@ -7,6 +7,7 @@ import { ErrorState, Field, Page, PageHeader, TableSkeleton, inputCls } from '..
 import { useToast } from '../../components/ui/Toast'
 import { moneyExact, quotationStatusLabel } from '../../lib/format'
 import { usePortalConfirm, usePortalNegotiate, usePortalQuote } from '../../lib/hooks'
+import { blockNegativeKey, sanitizeNonNegative } from '../../lib/numericInput'
 import type { PortalQuoteLine } from '../../lib/types'
 
 export function PortalQuotePage() {
@@ -41,7 +42,7 @@ export function PortalQuotePage() {
     )
   }
 
-  const locked = data.portalStatus === 'confirmed'
+  const locked = data.portalStatus === 'confirmed' || data.status === 'confirmed' || data.status === 'rejected'
 
   function updateLine(lineId: string, patch: Partial<PortalQuoteLine>) {
     setLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, ...patch } : l)))
@@ -89,8 +90,21 @@ export function PortalQuotePage() {
                     className={inputCls('w-24')}
                     disabled={locked}
                     type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    inputMode="decimal"
                     value={line.counterDiscount}
-                    onChange={(e) => updateLine(line.id, { counterDiscount: Number(e.target.value) })}
+                    onKeyDown={blockNegativeKey}
+                    onPaste={(e) => {
+                      const text = e.clipboardData.getData('text')
+                      if (/[-eE+]/.test(text) || Number(text) < 0) e.preventDefault()
+                    }}
+                    onChange={(e) => {
+                      const raw = sanitizeNonNegative(e.target.value)
+                      const n = Number(raw)
+                      updateLine(line.id, { counterDiscount: Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0 })
+                    }}
                   />
                 </td>
               </tr>

@@ -15,12 +15,12 @@ export function CountFigure({ value, className = '' }: { value: number; classNam
     const tick = (now: number) => {
       const t = Math.min(1, (now - started) / duration)
       const eased = 1 - (1 - t) ** 3
-      setShown(Math.round(from + (to - from) * eased))
+      setShown(Number((from + (to - from) * eased).toFixed(2)))
       if (t < 1) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
   }, [value])
 
-  return <span className={`font-serif tabular-nums ${className}`}>{shown}</span>
+  return <span className={`font-serif tabular-nums ${className}`}>{Number.isInteger(shown) ? shown : shown.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}</span>
 }
