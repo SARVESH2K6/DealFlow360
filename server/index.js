@@ -271,6 +271,9 @@ app.post('/api/quotations/:id/submit', auth, wrap(async (req, res) => {
     await actDb.logActivity(`${q.customerName} quotation ${q.number} submitted for approval`)
   }
   
+  const { calculateEstimatedDelivery } = await import('./db/approvals.js')
+  await calculateEstimatedDelivery(q.id)
+  
   await emitOrder(q.id)
   
   // Re-fetch to return latest state

@@ -98,6 +98,12 @@ export function PortalQuotePage() {
           </tbody>
         </table>
       </div>
+      <div className="mt-6 mb-6 flex gap-8">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Estimated Delivery Cost</p>
+          <p className="mt-1 font-serif text-[22px] tabular-nums text-ink">${data.estimatedDeliveryCost ?? 0}</p>
+        </div>
+      </div>
 
       <Field label="Requested Delivery Date">
         <input

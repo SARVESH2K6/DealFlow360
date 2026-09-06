@@ -275,11 +275,11 @@ function seed() {
   ]
 
   db.customers = [
-    { id: 'c-acme', name: 'Acme Corp', tier: 'Gold', region: 'North America', terms: 'Net 30' },
-    { id: 'c-globex', name: 'Globex Industries', tier: 'Silver', region: 'EMEA', terms: 'Net 45' },
-    { id: 'c-initech', name: 'Initech', tier: 'Bronze', region: 'North America', terms: 'Net 15' },
-    { id: 'c-umbrella', name: 'Umbrella LLC', tier: 'Gold', region: 'APAC', terms: 'Net 30' },
-    { id: 'c-stark', name: 'Stark Manufacturing', tier: 'Silver', region: 'North America', terms: 'Net 30' },
+    { id: 'c-acme', name: 'Acme Corp', tier: 'Gold', region: 'North America', city: 'Anand', terms: 'Net 30' },
+    { id: 'c-globex', name: 'Globex Industries', tier: 'Silver', region: 'EMEA', city: 'Pune', terms: 'Net 45' },
+    { id: 'c-initech', name: 'Initech', tier: 'Bronze', region: 'North America', city: 'Surat', terms: 'Net 15' },
+    { id: 'c-umbrella', name: 'Umbrella LLC', tier: 'Gold', region: 'APAC', city: 'Nagpur', terms: 'Net 30' },
+    { id: 'c-stark', name: 'Stark Manufacturing', tier: 'Silver', region: 'North America', city: 'Vadodara', terms: 'Net 30' },
   ]
 
   db.products = [
@@ -396,15 +396,15 @@ function seed() {
   ]
 
   db.stock = [
-    { warehouse: 'East DC', productId: 'p-sensor', productName: 'Industrial Sensor Array', inStock: 42, reserved: 8 },
-    { warehouse: 'East DC', productId: 'p-gateway', productName: 'Edge Gateway Pro', inStock: 18, reserved: 6 },
-    { warehouse: 'East DC', productId: 'p-spares', productName: 'Spare Parts Kit', inStock: 60, reserved: 4 },
-    { warehouse: 'West DC', productId: 'p-sensor', productName: 'Industrial Sensor Array', inStock: 11, reserved: 9 },
-    { warehouse: 'West DC', productId: 'p-gateway', productName: 'Edge Gateway Pro', inStock: 7, reserved: 7 },
-    { warehouse: 'West DC', productId: 'p-spares', productName: 'Spare Parts Kit', inStock: 22, reserved: 2 },
-    { warehouse: 'Central DC', productId: 'p-sensor', productName: 'Industrial Sensor Array', inStock: 28, reserved: 3 },
-    { warehouse: 'Central DC', productId: 'p-gateway', productName: 'Edge Gateway Pro', inStock: 14, reserved: 1 },
-    { warehouse: 'Central DC', productId: 'p-spares', productName: 'Spare Parts Kit', inStock: 40, reserved: 0 },
+    { warehouse: 'Mumbai', productId: 'p-sensor', productName: 'Industrial Sensor Array', inStock: 42, reserved: 8 },
+    { warehouse: 'Mumbai', productId: 'p-gateway', productName: 'Edge Gateway Pro', inStock: 18, reserved: 6 },
+    { warehouse: 'Jodhpur', productId: 'p-spares', productName: 'Spare Parts Kit', inStock: 60, reserved: 4 },
+    { warehouse: 'Ahmedabad', productId: 'p-sensor', productName: 'Industrial Sensor Array', inStock: 11, reserved: 9 },
+    { warehouse: 'Ahmedabad', productId: 'p-gateway', productName: 'Edge Gateway Pro', inStock: 7, reserved: 7 },
+    { warehouse: 'Ahmedabad', productId: 'p-spares', productName: 'Spare Parts Kit', inStock: 22, reserved: 2 },
+    { warehouse: 'Rajkot', productId: 'p-sensor', productName: 'Industrial Sensor Array', inStock: 28, reserved: 3 },
+    { warehouse: 'Rajkot', productId: 'p-gateway', productName: 'Edge Gateway Pro', inStock: 14, reserved: 1 },
+    { warehouse: 'Rajkot', productId: 'p-spares', productName: 'Spare Parts Kit', inStock: 40, reserved: 0 },
   ]
 
   const q1042 = computeQuotationRisk({

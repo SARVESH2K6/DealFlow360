@@ -46,6 +46,16 @@ export async function getFulfillmentOrder(id) {
     })
   }
 
+  let estimatedDeliveryCost = 0
+  let finalDeliveryCost = 0
+  if (f.quotation_id) {
+    const { rows: qRows } = await query('SELECT estimated_delivery_cost, final_delivery_cost FROM quotations WHERE id = $1', [f.quotation_id])
+    if (qRows.length > 0) {
+      estimatedDeliveryCost = Number(qRows[0].estimated_delivery_cost)
+      finalDeliveryCost = Number(qRows[0].final_delivery_cost)
+    }
+  }
+
   return {
     id: f.id,
     quotationId: f.quotation_id,
@@ -57,14 +67,28 @@ export async function getFulfillmentOrder(id) {
     lines,
     splitAccepted: f.split_accepted,
     overridden: f.overridden,
+    estimatedDeliveryCost,
+    finalDeliveryCost,
   }
 }
 
 export async function acceptSplit(id, userName) {
   await query("UPDATE fulfillment_orders SET status = 'ready', split_accepted = true WHERE id = $1", [id])
   const logId = `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-  const { rows } = await query('SELECT order_number FROM fulfillment_orders WHERE id = $1', [id])
-  await query('INSERT INTO activity (id, text, timestamp) VALUES ($1, $2, $3)', [logId, `${rows[0]?.order_number} split shipment accepted by ${userName}`, new Date().toISOString()])
+  const { rows } = await query('SELECT order_number, quotation_id FROM fulfillment_orders WHERE id = $1', [id])
+  const orderInfo = rows[0]
+  await query('INSERT INTO activity (id, text, timestamp) VALUES ($1, $2, $3)', [logId, `${orderInfo?.order_number} split shipment accepted by ${userName}`, new Date().toISOString()])
+  
+  if (orderInfo?.quotation_id) {
+    const { rows: sumRows } = await query(`
+      SELECT COALESCE(SUM(fs.cost), 0) as total_cost 
+      FROM fulfillment_suggested fs
+      JOIN fulfillment_lines fl ON fs.fulfillment_line_id = fl.id
+      WHERE fl.fulfillment_id = $1
+    `, [id])
+    await query('UPDATE quotations SET final_delivery_cost = $1 WHERE id = $2', [sumRows[0].total_cost, orderInfo.quotation_id])
+  }
+
   return getFulfillmentOrder(id)
 }
 
@@ -90,7 +114,19 @@ export async function overrideFulfillment(id, body, userName) {
     }
   }
   const logId = `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-  const { rows } = await query('SELECT order_number FROM fulfillment_orders WHERE id = $1', [id])
-  await query('INSERT INTO activity (id, text, timestamp) VALUES ($1, $2, $3)', [logId, `${rows[0]?.order_number} inventory override by ${userName}`, new Date().toISOString()])
+  const { rows } = await query('SELECT order_number, quotation_id FROM fulfillment_orders WHERE id = $1', [id])
+  const orderInfo = rows[0]
+  await query('INSERT INTO activity (id, text, timestamp) VALUES ($1, $2, $3)', [logId, `${orderInfo?.order_number} inventory override by ${userName}`, new Date().toISOString()])
+  
+  if (orderInfo?.quotation_id) {
+    const { rows: sumRows } = await query(`
+      SELECT COALESCE(SUM(fs.cost), 0) as total_cost 
+      FROM fulfillment_suggested fs
+      JOIN fulfillment_lines fl ON fs.fulfillment_line_id = fl.id
+      WHERE fl.fulfillment_id = $1
+    `, [id])
+    await query('UPDATE quotations SET final_delivery_cost = $1 WHERE id = $2', [sumRows[0].total_cost, orderInfo.quotation_id])
+  }
+
   return getFulfillmentOrder(id)
 }

@@ -50,6 +50,8 @@ export async function getPortalQuote(id, customerId) {
     portalStatus: q.portal_status || (q.status === 'confirmed' ? 'confirmed' : 'sent'),
     requestedDeliveryDate: q.requested_delivery_date || '',
     currency: q.currency, terms: q.terms, lines: safeLines,
+    estimatedDeliveryCost: Number(q.estimated_delivery_cost) || 0,
+    finalDeliveryCost: Number(q.final_delivery_cost) || 0,
   }
 }
 

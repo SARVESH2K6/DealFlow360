@@ -145,6 +145,8 @@ export interface QuotationDetail extends QuotationListItem {
   portalStatus?: string
   requestedDeliveryDate?: string
   repId: string
+  estimatedDeliveryCost?: number
+  finalDeliveryCost?: number
 }
 
 export interface ActivityItem {
@@ -260,6 +262,8 @@ export interface FulfillmentOrder {
   canConsolidate?: boolean
   remainingQty?: number
   consolidated?: boolean
+  estimatedDeliveryCost?: number
+  finalDeliveryCost?: number
 }
 
 export interface FulfillmentPayload {

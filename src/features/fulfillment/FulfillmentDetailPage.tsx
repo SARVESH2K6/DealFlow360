@@ -60,6 +60,19 @@ export function FulfillmentDetailPage() {
         actions={<Badge status={view.status}>{quotationStatusLabel(view.status)}</Badge>}
       />
 
+      <div className="mb-6 flex gap-8 border-b border-border pb-6">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Estimated Delivery Cost</p>
+          <p className="mt-1 font-serif text-[22px] tabular-nums text-ink">${view.estimatedDeliveryCost ?? 0}</p>
+        </div>
+        {view.finalDeliveryCost > 0 ? (
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-inkMuted">Final Delivery Cost</p>
+            <p className="mt-1 font-serif text-[22px] tabular-nums text-ok">${view.finalDeliveryCost}</p>
+          </div>
+        ) : null}
+      </div>
+
       {view.canConsolidate ? (
         <div className="mb-6 border-l-[3px] border-warn bg-warnBg/40 px-4 py-4">
           <p className="mb-4 text-[13px] leading-relaxed text-warn">

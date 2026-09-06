@@ -55,6 +55,8 @@ async function toDetail(row) {
     portalStatus: row.portal_status,
     requestedDeliveryDate: row.requested_delivery_date,
     repId: row.rep_id,
+    estimatedDeliveryCost: Number(row.estimated_delivery_cost) || 0,
+    finalDeliveryCost: Number(row.final_delivery_cost) || 0,
   }
 }
 

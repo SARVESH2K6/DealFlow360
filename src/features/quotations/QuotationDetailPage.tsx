@@ -159,6 +159,11 @@ export function QuotationDetailPage() {
         </LedgerRow>
         <LedgerRow label="Region">{data.region}</LedgerRow>
         <LedgerRow label="Payment terms">{data.terms}</LedgerRow>
+        {data.finalDeliveryCost > 0 ? (
+          <LedgerRow label="Delivery Cost (Final)">{moneyExact(data.finalDeliveryCost)}</LedgerRow>
+        ) : data.estimatedDeliveryCost > 0 ? (
+          <LedgerRow label="Delivery Cost (Estimated)">{moneyExact(data.estimatedDeliveryCost)}</LedgerRow>
+        ) : null}
       </section>
 
       {data.lines.length === 0 ? (

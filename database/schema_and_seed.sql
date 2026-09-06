@@ -47,6 +47,7 @@ CREATE TABLE customers (
     name        VARCHAR(255) NOT NULL,
     tier        VARCHAR(20)  NOT NULL CHECK (tier IN ('Bronze','Silver','Gold')),
     region      VARCHAR(100) NOT NULL,
+    city        VARCHAR(100),
     terms       VARCHAR(50)  NOT NULL
 );
 
@@ -162,7 +163,9 @@ CREATE TABLE quotations (
                                 CHECK (risk_level IN ('LOW','MEDIUM','HIGH')),
     blended_risk            NUMERIC(6,2)  NOT NULL DEFAULT 0,
     flag_reasons            JSONB,
-    requested_delivery_date DATE
+    requested_delivery_date DATE,
+    estimated_delivery_cost NUMERIC(10,2) NOT NULL DEFAULT 0,
+    final_delivery_cost     NUMERIC(10,2) NOT NULL DEFAULT 0
 );
 
 -- quotation_lines
@@ -334,12 +337,12 @@ CREATE TABLE activity (
 -- =============================================================================
 
 -- customers
-INSERT INTO customers (id, name, tier, region, terms) VALUES
-  ('c-acme',     'Acme Corp',           'Gold',   'North America', 'Net 30'),
-  ('c-globex',   'Globex Industries',   'Silver', 'EMEA',          'Net 45'),
-  ('c-initech',  'Initech',             'Bronze', 'North America', 'Net 15'),
-  ('c-umbrella', 'Umbrella LLC',        'Gold',   'APAC',          'Net 30'),
-  ('c-stark',    'Stark Manufacturing', 'Silver', 'North America', 'Net 30');
+INSERT INTO customers (id, name, tier, region, city, terms) VALUES
+  ('c-acme',    'Acme Corp',           'Gold',   'North America', 'Anand',    'Net 30'),
+  ('c-globex',  'Globex Industries',   'Silver', 'EMEA',          'Pune',     'Net 45'),
+  ('c-initech', 'Initech',             'Bronze', 'North America', 'Surat',    'Net 15'),
+  ('c-umbrella','Umbrella LLC',        'Gold',   'APAC',          'Nagpur',   'Net 30'),
+  ('c-stark',   'Stark Manufacturing', 'Silver', 'North America', 'Vadodara', 'Net 30');
 
 -- users (password: "password" - use bcrypt hashes in production!)
 INSERT INTO users (id, email, password, name, role, customer_id) VALUES
@@ -381,15 +384,15 @@ INSERT INTO pricelist_rules (pricelist_id, tier, currency, price_rule) VALUES
 
 -- stock
 INSERT INTO stock (warehouse, product_id, product_name, in_stock, reserved) VALUES
-  ('East DC',    'p-sensor',  'Industrial Sensor Array', 42, 8),
-  ('East DC',    'p-gateway', 'Edge Gateway Pro',        18, 6),
-  ('East DC',    'p-spares',  'Spare Parts Kit',         60, 4),
-  ('West DC',    'p-sensor',  'Industrial Sensor Array', 11, 9),
-  ('West DC',    'p-gateway', 'Edge Gateway Pro',         7, 7),
-  ('West DC',    'p-spares',  'Spare Parts Kit',         22, 2),
-  ('Central DC', 'p-sensor',  'Industrial Sensor Array', 28, 3),
-  ('Central DC', 'p-gateway', 'Edge Gateway Pro',        14, 1),
-  ('Central DC', 'p-spares',  'Spare Parts Kit',         40, 0);
+  ('Mumbai',     'p-sensor',  'Industrial Sensor Array', 42, 8),
+  ('Mumbai',     'p-gateway', 'Edge Gateway Pro',        18, 6),
+  ('Jodhpur',    'p-spares',  'Spare Parts Kit',         60, 4),
+  ('Ahmedabad',  'p-sensor',  'Industrial Sensor Array', 11, 9),
+  ('Ahmedabad',  'p-gateway', 'Edge Gateway Pro',         7, 7),
+  ('Ahmedabad',  'p-spares',  'Spare Parts Kit',         22, 2),
+  ('Rajkot',     'p-sensor',  'Industrial Sensor Array', 28, 3),
+  ('Rajkot',     'p-gateway', 'Edge Gateway Pro',        14, 1),
+  ('Rajkot',     'p-spares',  'Spare Parts Kit',         40, 0);
 
 -- discount config
 INSERT INTO discount_tier_discounts (id, tier, max_discount) VALUES
