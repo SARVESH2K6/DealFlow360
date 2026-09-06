@@ -5,7 +5,6 @@ import { ApprovalDetailPage } from '../features/approvals/ApprovalDetailPage'
 import { ApprovalsListPage } from '../features/approvals/ApprovalsListPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
-import { DealHealthPage } from '../features/deal-health/DealHealthPage'
 import { FulfillmentDetailPage } from '../features/fulfillment/FulfillmentDetailPage'
 import { FulfillmentListPage } from '../features/fulfillment/FulfillmentListPage'
 import { InvoiceDetailPage } from '../features/invoices/InvoiceDetailPage'
@@ -54,14 +53,6 @@ export function AppRouter() {
           <Route path="subscriptions/:id" element={<SubscriptionDetailPage />} />
           <Route path="invoices" element={<InvoicesListPage />} />
           <Route path="invoices/:id" element={<InvoiceDetailPage />} />
-          <Route
-            path="deal-health"
-            element={
-              <RequireRole roles={['manager', 'finance', 'admin']}>
-                <DealHealthPage />
-              </RequireRole>
-            }
-          />
           <Route
             path="reports"
             element={

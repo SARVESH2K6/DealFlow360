@@ -13,7 +13,6 @@ import * as appDb from './db/approvals.js'
 import * as fulfillDb from './db/fulfillment.js'
 import * as subDb from './db/subscriptions.js'
 import * as invDb from './db/invoices.js'
-import * as healthDb from './db/dealHealth.js'
 import * as portalDb from './db/portal.js'
 import * as actDb from './db/activity.js'
 import * as confDb from './db/discountConfig.js'
@@ -412,23 +411,6 @@ app.post('/api/invoices/:id/status', auth, requireRoles(['rep', 'manager', 'fina
   res.json(data)
 }))
 
-// ── Deal Health ──────────────────────────────────────────────────────
-
-app.get('/api/deal-health', auth, requireRoles(APPROVERS), wrap(async (_req, res) => {
-  res.json(await healthDb.getDealHealth())
-}))
-
-app.post('/api/deal-health/:id/escalate', auth, requireRoles(APPROVERS), wrap(async (req, res) => {
-  const data = await healthDb.escalate(req.params.id, req.user.name)
-  if (!data) return res.status(404).json({ error: 'Not found' })
-  res.json(data)
-}))
-
-app.post('/api/deal-health/:id/nudge', auth, requireRoles(APPROVERS), wrap(async (req, res) => {
-  const data = await healthDb.nudge(req.params.id, req.user.name)
-  if (!data) return res.status(404).json({ error: 'Not found' })
-  res.json(data)
-}))
 
 // ── Discount Config ──────────────────────────────────────────────────
 

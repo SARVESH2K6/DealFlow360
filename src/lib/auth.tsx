@@ -85,9 +85,7 @@ export function canSeeApprovals(role: Role | undefined): boolean {
   return role === 'manager' || role === 'finance' || role === 'admin'
 }
 
-export function canSeeDealHealth(role: Role | undefined): boolean {
-  return role === 'manager' || role === 'finance' || role === 'admin'
-}
+
 
 export function canSeeReports(role: Role | undefined): boolean {
   return role === 'admin'

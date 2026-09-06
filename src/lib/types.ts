@@ -337,26 +337,10 @@ export interface Invoice {
   lines: InvoiceLine[]
   approvedBy: InvoiceApprover[]
   paymentRecordedBy: InvoiceApprover | null
+  quotationId: string | null
 }
 
-export interface DealHealthItem {
-  id: string
-  deal: string
-  quotationId: string
-  issue: string
-  flagged: string
-  type: 'stalled' | 'anomaly' | 'slippage'
-  escalated?: boolean
-  nudged?: boolean
-}
 
-export interface DealHealthPayload {
-  stalled: number
-  anomalies: number
-  slippage: number
-  items: DealHealthItem[]
-  byStage: { stage: string; count: number }[]
-}
 
 export interface ReportsPayload {
   quotesCreated: number

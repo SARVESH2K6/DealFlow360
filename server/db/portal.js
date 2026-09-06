@@ -147,6 +147,8 @@ export async function confirmPortalQuote(id, customerId, user) {
   await createFulfillmentFromQuote(id)
   const { createSubscriptionFromQuote } = await import('./subscriptions.js')
   await createSubscriptionFromQuote(id)
+  const { createInvoiceFromQuotation } = await import('./invoices.js')
+  await createInvoiceFromQuotation(id)
 
   const { rows: aRows } = await query('SELECT * FROM approvals WHERE quotation_id = $1', [id])
   if (aRows.length > 0) {

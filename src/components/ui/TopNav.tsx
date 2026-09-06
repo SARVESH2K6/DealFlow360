@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   canSeeApprovals,
-  canSeeDealHealth,
   canSeeDiscountConfig,
   canSeeProducts,
   canSeeReports,
@@ -29,7 +28,6 @@ function tabsForInternal(role: Role | undefined): Tab[] {
     { to: '/app/subscriptions', label: 'Subscriptions' },
     { to: '/app/invoices', label: 'Invoices' },
   )
-  if (canSeeDealHealth(role)) tabs.push({ to: '/app/deal-health', label: 'Deal Health' })
   if (canSeeReports(role)) tabs.push({ to: '/app/reports', label: 'Reports' })
   if (canSeeProducts(role)) tabs.push({ to: '/app/products', label: 'Product' })
   if (canSeeDiscountConfig(role)) {

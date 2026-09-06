@@ -143,7 +143,7 @@ app.get('/api/dashboard/summary', auth, (req, res) => {
   const openQuotations = visible.filter((q) =>
     ['draft', 'returned', 'pending_approval', 'negotiation'].includes(q.status),
   ).length
-  const atRiskDeals = db.dealHealth.length
+  const atRiskDeals = 0
   let valueWeight = 0
   let discountWeight = 0
   for (const q of visible) {
@@ -674,41 +674,7 @@ app.post('/api/invoices/:id/status', auth, requireRoles(['rep', 'manager', 'admi
   res.json(applyInvoiceStatus(invoice, status, req.user))
 })
 
-app.get('/api/deal-health', auth, (_req, res) => {
-  const stalled = db.dealHealth.filter((d) => d.type === 'stalled').length
-  const anomalies = db.dealHealth.filter((d) => d.type === 'anomaly').length
-  const slippage = db.dealHealth.filter((d) => d.type === 'slippage').length
-  const byStage = [
-    { stage: 'Draft', count: db.quotations.filter((q) => q.status === 'draft').length },
-    { stage: 'Pending', count: db.quotations.filter((q) => q.status === 'pending_approval').length },
-    { stage: 'Negotiation', count: db.quotations.filter((q) => q.status === 'negotiation').length },
-    { stage: 'Approved', count: db.quotations.filter((q) => q.status === 'approved').length },
-    { stage: 'Confirmed', count: db.quotations.filter((q) => q.status === 'confirmed').length },
-  ]
-  res.json({
-    stalled,
-    anomalies,
-    slippage,
-    items: db.dealHealth,
-    byStage,
-  })
-})
 
-app.post('/api/deal-health/:id/escalate', auth, (req, res) => {
-  const item = db.dealHealth.find((d) => d.id === req.params.id)
-  if (!item) return res.status(404).json({ error: 'Flag not found' })
-  logActivity(`${req.user.name} escalated ${item.deal}: ${item.issue}`)
-  item.escalated = true
-  res.json(item)
-})
-
-app.post('/api/deal-health/:id/nudge', auth, (req, res) => {
-  const item = db.dealHealth.find((d) => d.id === req.params.id)
-  if (!item) return res.status(404).json({ error: 'Flag not found' })
-  logActivity(`${req.user.name} nudged the rep on ${item.deal}`)
-  item.nudged = true
-  res.json(item)
-})
 
 app.get('/api/reports', auth, requireRoles(['admin']), (req, res) => {
   const period = String(req.query.period || 'Q3 2026')

@@ -11,7 +11,6 @@
 
 DROP TABLE IF EXISTS activity                     CASCADE;
 DROP TABLE IF EXISTS portal_messages              CASCADE;
-DROP TABLE IF EXISTS deal_health                  CASCADE;
 DROP TABLE IF EXISTS invoice_lines                CASCADE;
 DROP TABLE IF EXISTS invoices                     CASCADE;
 DROP TABLE IF EXISTS subscription_recurring_lines CASCADE;
@@ -288,7 +287,8 @@ CREATE TABLE invoices (
     note                 TEXT,
     items                JSONB         NOT NULL DEFAULT '[]',
     approved_by          JSONB         NOT NULL DEFAULT '[]',
-    payment_recorded_by  JSONB
+    payment_recorded_by  JSONB,
+    quotation_id         VARCHAR(50)   REFERENCES quotations(id) ON DELETE SET NULL
 );
 
 -- invoice_lines
@@ -301,17 +301,6 @@ CREATE TABLE invoice_lines (
     due_date   DATE
 );
 
--- deal_health
-CREATE TABLE deal_health (
-    id           VARCHAR(50)  PRIMARY KEY,
-    deal         VARCHAR(255) NOT NULL,
-    quotation_id VARCHAR(50)  REFERENCES quotations(id) ON DELETE CASCADE,
-    issue        TEXT,
-    flagged      TIMESTAMPTZ,
-    type         VARCHAR(20)  NOT NULL CHECK (type IN ('stalled','anomaly','slippage')),
-    escalated    BOOLEAN      NOT NULL DEFAULT FALSE,
-    nudged       BOOLEAN      NOT NULL DEFAULT FALSE
-);
 
 -- portal_messages
 CREATE TABLE portal_messages (

@@ -13,8 +13,6 @@ import type {
   ApprovalListItem,
   Customer,
   DashboardSummary,
-  DealHealthItem,
-  DealHealthPayload,
   DiscountConfig,
   FulfillmentOrder,
   FulfillmentPayload,
@@ -363,24 +361,6 @@ export function useSetInvoiceStatus(id: string) {
   })
 }
 
-export function useDealHealth() {
-  return useQuery({
-    queryKey: ['deal-health'],
-    queryFn: () => api<DealHealthPayload>('/api/deal-health'),
-  })
-}
-
-export function useDealHealthAction() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (args: { id: string; action: 'escalate' | 'nudge' }) =>
-      api<DealHealthItem>(`/api/deal-health/${args.id}/${args.action}`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['deal-health'] }),
-  })
-}
 
 export function useReports(filters: { period: string; team: string; status: string; product: string }) {
   const params = new URLSearchParams(filters)
