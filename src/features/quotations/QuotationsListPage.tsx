@@ -4,18 +4,21 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { ErrorState, Page, PageHeader, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
+import { ErrorState, Page, PageHeader, SearchField, StatRowSkeleton, TableSkeleton } from '../../components/ui/Page'
 import { StatCard } from '../../components/ui/StatCard'
 import { badgeFromStatus, formatDate, money, quotationStatusLabel } from '../../lib/format'
 import { useCreateQuotation, useQuotations } from '../../lib/hooks'
+import { matchesSearch } from '../../lib/search'
 import type { QuotationListItem, QuotationStatus } from '../../lib/types'
 
 const FILTERS: { key: QuotationStatus | 'all'; label: string }[] = [
   { key: 'draft', label: 'Draft' },
+  { key: 'returned', label: 'Returned' },
   { key: 'pending_approval', label: 'Pending Approval' },
   { key: 'approved', label: 'Approved' },
   { key: 'negotiation', label: 'Negotiation' },
   { key: 'confirmed', label: 'Confirmed' },
+  { key: 'rejected', label: 'Rejected' },
 ]
 
 export function QuotationsListPage() {
@@ -23,12 +26,16 @@ export function QuotationsListPage() {
   const create = useCreateQuotation()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<QuotationStatus | 'all'>('all')
+  const [query, setQuery] = useState('')
+  const [tableView, setTableView] = useState(false)
 
   const items = data?.items ?? []
-  const filtered = useMemo(
-    () => (filter === 'all' ? items : items.filter((q) => q.status === filter)),
-    [items, filter],
-  )
+  const filtered = useMemo(() => {
+    const byStatus = filter === 'all' ? items : items.filter((q) => q.status === filter)
+    return byStatus.filter((q) =>
+      matchesSearch(query, [q.number, q.customerName, q.repName, quotationStatusLabel(q.status)]),
+    )
+  }, [items, filter, query])
 
   async function newQuote() {
     const created = await create.mutateAsync({})
@@ -60,9 +67,16 @@ export function QuotationsListPage() {
       <PageHeader
         title="Quotations"
         actions={
-          <Button variant="commit" onClick={() => void newQuote()} loading={create.isPending}>
-            New quotation
-          </Button>
+          <>
+            {data && filtered.length > 0 ? (
+              <Button variant="secondary" onClick={() => setTableView((v) => !v)}>
+                {tableView ? 'Switch to Card View' : 'Switch to Table View'}
+              </Button>
+            ) : null}
+            <Button variant="commit" onClick={() => void newQuote()} loading={create.isPending}>
+              New quotation
+            </Button>
+          </>
         }
       />
 
@@ -70,7 +84,7 @@ export function QuotationsListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
 
       {data ? (
-        <div className="grid grid-cols-7 gap-px bg-bronze/30">
+        <div className="grid grid-cols-4 gap-px bg-bronze/30 lg:grid-cols-7">
           {FILTERS.map((f) => {
             const subset = items.filter((q) => q.status === f.key)
             const total = subset.reduce((s, q) => s + q.amount, 0)
@@ -88,22 +102,53 @@ export function QuotationsListPage() {
         </div>
       ) : null}
 
+      {data ? <SearchField value={query} onChange={setQuery} placeholder="Search quotations" /> : null}
+
       {isLoading ? <TableSkeleton /> : null}
       {data && filtered.length === 0 ? (
         <EmptyState
           title="No quotations"
-          message="No quotations in this view."
-          action={{ label: 'New quotation', onClick: () => void newQuote() }}
+          message={query.trim() ? 'No quotations match this search.' : 'No quotations in this view.'}
+          action={
+            query.trim()
+              ? undefined
+              : { label: 'New quotation', onClick: () => void newQuote() }
+          }
         />
       ) : null}
 
-      {data && filtered.length > 0 ? (
+      {data && filtered.length > 0 && tableView ? (
         <DataTable
           columns={columns}
           rows={filtered}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate(`/app/quotations/${r.id}`)}
         />
+      ) : null}
+
+      {data && filtered.length > 0 && !tableView ? (
+        <div className="grid grid-cols-1 gap-px bg-bronze/30 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              className="bg-sheet px-4 py-4 text-left transition-colors duration-150 hover:bg-surfaceAlt/70"
+              onClick={() => navigate(`/app/quotations/${q.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-serif text-[18px] leading-tight text-ink">{q.customerName}</p>
+                  <p className="mt-0.5 text-[12px] text-inkFaint">{q.number}</p>
+                </div>
+                <Badge status={badgeFromStatus(q.status)}>{quotationStatusLabel(q.status)}</Badge>
+              </div>
+              <p className="mt-4 font-serif text-[22px] tabular-nums tracking-tight text-ink">{money(q.amount)}</p>
+              <p className="mt-1 text-[12px] text-inkMuted">
+                {q.repName} · {formatDate(q.date)}
+              </p>
+            </button>
+          ))}
+        </div>
       ) : null}
     </Page>
   )

@@ -112,6 +112,7 @@ export function LoginPage() {
                     className={inputCls()}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    required={mode === 'signup'}
                     tabIndex={mode === 'signup' ? 0 : -1}
                     autoComplete="name"
                   />
@@ -149,18 +150,13 @@ export function LoginPage() {
         </form>
 
         <div className="relative mt-3 min-h-[2.5rem]">
-          <button
-            type="button"
-            className={`absolute inset-x-0 top-0 text-left text-[13px] text-inkMuted transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-ink ${
+          <p
+            className={`absolute inset-x-0 top-0 text-[13px] leading-snug text-inkMuted transition-all duration-300 ${
               mode === 'login' ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
             }`}
-            onClick={() =>
-              setNotice('Forgot Password is a stub. Contact your administrator to reset a password.')
-            }
-            tabIndex={mode === 'login' ? 0 : -1}
           >
-            Forgot Password?
-          </button>
+            Password resets are handled by an administrator.
+          </p>
           <p
             className={`absolute inset-x-0 top-0 text-[12px] leading-snug text-inkMuted transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
               mode === 'signup' ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'

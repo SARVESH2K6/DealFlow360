@@ -40,58 +40,115 @@ export function lineLimit(line, customerTier, config) {
 
 export function lineStatus(discountPercent, limit) {
   if (discountPercent > limit) return 'over'
-  if (discountPercent >= Math.max(0, limit - 2)) return 'near'
+  if (discountPercent >= Math.max(0, limit - 2) && discountPercent < limit) return 'near'
   return 'within'
 }
 
+export const QUOTE_EDITABLE = new Set(['draft', 'rejected', 'returned', 'negotiation'])
+
+export function isQuoteEditable(status) {
+  return QUOTE_EDITABLE.has(status)
+}
+
+export function httpError(status, message) {
+  const err = new Error(message)
+  err.status = status
+  return err
+}
+
+export function parseDiscountPercent(value) {
+  if (value === undefined || value === null) return { skip: true }
+  if (typeof value === 'string' && value.trim() === '') {
+    return { error: 'Discount percent is required' }
+  }
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return { error: 'Discount percent must be a number' }
+  if (n < 0) return { error: 'Discount percent cannot be negative' }
+  if (n > 100) return { error: 'Discount percent cannot exceed 100' }
+  return { value: n }
+}
+
+export function parseQty(value) {
+  if (value === undefined || value === null) return { skip: true }
+  if (typeof value === 'string' && value.trim() === '') {
+    return { error: 'Quantity is required' }
+  }
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return { error: 'Quantity must be a number' }
+  if (n < 1) return { error: 'Quantity must be at least 1' }
+  return { value: n }
+}
+
 /**
- * Compute risk in JS given lines array, customerTier, and discountConfig.
- * Returns { amount, riskScore, riskLevel, blendedRisk, flagReasons, lines (annotated) }.
+ * Spec:
+ *   violation = max(0, discountPercent - categoryCeiling)
+ *   weight = line.subtotal / order.totalSubtotal
+ *   riskScore = sum(violation * weight)
+ * Zero lines / zero-value lines resolve to 0, never NaN.
  */
 export function computeRisk(lines, customerTier, config) {
-  let weightedOver = 0
-  let totalValue = 0
   const flagReasons = []
+  let totalSubtotal = 0
+  const prepared = []
 
   for (const line of lines) {
     const limit = lineLimit(line, customerTier, config)
+    const discount = Number(line.discountPercent)
+    const qty = Number(line.qty)
+    const price = Number(line.price)
+    const subtotal = (Number.isFinite(qty) ? qty : 0) * (Number.isFinite(price) ? price : 0)
+    const disc = Number.isFinite(discount) ? discount : 0
+    const violation = Math.max(0, disc - limit)
     line.limit = limit
-    line.status = lineStatus(Number(line.discountPercent), limit)
-    const lineValue = Number(line.qty) * Number(line.price)
-    totalValue += lineValue
-    const overBy = Math.max(0, Math.round((Number(line.discountPercent) - limit) * 10) / 10)
-    if (overBy > 0) {
-      weightedOver += (overBy / 100) * lineValue
+    line.status = lineStatus(disc, limit)
+    totalSubtotal += subtotal
+    prepared.push({ line, limit, disc, subtotal, violation })
+  }
+
+  let riskScore = 0
+  for (const row of prepared) {
+    const weight = totalSubtotal === 0 ? 0 : row.subtotal / totalSubtotal
+    riskScore += row.violation * weight
+    if (row.violation > 0) {
       flagReasons.push({
-        line: line.productName,
-        discountGiven: Number(line.discountPercent),
-        limitAllowed: limit,
-        overBy,
+        line: row.line.productName,
+        discountGiven: row.disc,
+        limitAllowed: row.limit,
+        overBy: Math.round(row.violation * 100) / 100,
       })
     }
   }
 
-  const blended = totalValue === 0 ? 0 : (weightedOver / totalValue) * 100
-  const overCount = lines.filter((l) => l.status === 'over').length
-  const riskScore = Math.min(100, Math.round(blended * 8 + overCount * 18))
+  riskScore = Math.round(riskScore * 100) / 100
+  const highCut = Number(config.thresholds?.high ?? 4)
+  const medCut = Number(config.thresholds?.medium ?? 0)
 
-  const highCut = Number(config.thresholds.high)
-  const medCut = Number(config.thresholds.medium)
   let riskLevel = 'LOW'
-  if (blended >= highCut || lines.some((l) => Number(l.discountPercent) - l.limit > 5)) {
-    riskLevel = 'HIGH'
-  } else if (blended > medCut || overCount > 0) {
-    riskLevel = 'MEDIUM'
+  if (riskScore > 0) {
+    if (riskScore >= highCut) riskLevel = 'HIGH'
+    else if (medCut === 0 || riskScore >= medCut) riskLevel = 'MEDIUM'
   }
 
   const amount = lines.reduce((sum, l) => {
-    return sum + Number(l.qty) * Number(l.price) * (1 - Number(l.discountPercent) / 100)
+    const disc = Number(l.discountPercent)
+    const qty = Number(l.qty)
+    const price = Number(l.price)
+    if (!Number.isFinite(qty) || !Number.isFinite(price)) return sum
+    const pct = Number.isFinite(disc) ? disc : 0
+    return sum + qty * price * (1 - pct / 100)
   }, 0)
 
-  return { amount, riskScore, riskLevel, blendedRisk: Math.round(blended * 10) / 10, flagReasons, lines }
+  return { amount, riskScore, riskLevel, blendedRisk: riskScore, flagReasons, lines }
 }
 
-export function requiredApprovalLevel(riskLevel) {
+export function requiredApprovalLevel(riskLevel, config) {
+  const row = config?.approvalChain?.find(
+    (c) => String(c.trigger || '').toUpperCase() === String(riskLevel || '').toUpperCase(),
+  )
+  const routing = String(row?.routing || '')
+  if (/finance/i.test(routing)) return 'finance'
+  if (/manager/i.test(routing)) return 'manager'
+  if (/no approval/i.test(routing)) return 'none'
   if (riskLevel === 'HIGH') return 'finance'
   if (riskLevel === 'MEDIUM') return 'manager'
   return 'none'
@@ -160,7 +217,16 @@ export async function getUpsells(lines) {
 
 // ── Quotation risk compute + persist ─────────────────────────────────
 
+let riskColumnsReady = false
+async function ensureRiskNumericColumns() {
+  if (riskColumnsReady) return
+  await query('ALTER TABLE quotations ALTER COLUMN risk_score TYPE NUMERIC(12,2) USING risk_score::numeric').catch(() => {})
+  await query('ALTER TABLE quotations ALTER COLUMN blended_risk TYPE NUMERIC(12,2) USING blended_risk::numeric').catch(() => {})
+  riskColumnsReady = true
+}
+
 export async function computeAndPersistRisk(quotationId) {
+  await ensureRiskNumericColumns()
   const { rows: qRows } = await query(
     'SELECT q.id, q.customer_id, c.tier AS customer_tier, c.name AS customer_name FROM quotations q JOIN customers c ON c.id = q.customer_id WHERE q.id = $1',
     [quotationId],

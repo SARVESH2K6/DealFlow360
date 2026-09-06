@@ -2,6 +2,7 @@ export type Role = 'rep' | 'manager' | 'finance' | 'admin' | 'customer'
 
 export type QuotationStatus =
   | 'draft'
+  | 'returned'
   | 'pending_approval'
   | 'approved'
   | 'negotiation'
@@ -208,6 +209,7 @@ export interface SubmitResult {
   quotation: QuotationDetail
   approvalRequired: boolean
   approvalId: string
+  fulfillmentId?: string | null
   riskScore: number
   riskLevel: RiskLevel
 }

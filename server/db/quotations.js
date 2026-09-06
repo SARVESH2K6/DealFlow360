@@ -1,5 +1,5 @@
 import { query } from './pool.js'
-import { nextId, computeAndPersistRisk, getUpsells } from './helpers.js'
+import { nextId, computeAndPersistRisk, getUpsells, isQuoteEditable, httpError, parseDiscountPercent, parseQty } from './helpers.js'
 
 // ── Quotation list item shape ────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export async function listQuotations(user) {
   let rows
   if (user.role === 'customer') {
     const result = await query(
-      'SELECT * FROM quotations WHERE customer_id = $1 ORDER BY date DESC',
+      "SELECT * FROM quotations WHERE customer_id = $1 AND status <> 'draft' ORDER BY date DESC",
       [user.customerId],
     )
     rows = result.rows
@@ -72,24 +72,17 @@ export async function listQuotations(user) {
     const result = await query('SELECT * FROM quotations ORDER BY date DESC')
     rows = result.rows
   }
-  // Recompute risk for all
-  for (const row of rows) {
-    await computeAndPersistRisk(row.id)
-  }
-  // Re-fetch after risk update
-  const ids = rows.map((r) => r.id)
-  if (ids.length === 0) return []
-  const { rows: updated } = await query(
-    'SELECT * FROM quotations WHERE id = ANY($1) ORDER BY date DESC',
-    [ids],
-  )
-  return updated.map(toListItem)
+  return rows.map(toListItem)
 }
 
 export async function getQuotation(id) {
-  await computeAndPersistRisk(id)
   const { rows } = await query('SELECT * FROM quotations WHERE id = $1', [id])
   if (rows.length === 0) return null
+  if (isQuoteEditable(rows[0].status)) {
+    await computeAndPersistRisk(id)
+    const { rows: fresh } = await query('SELECT * FROM quotations WHERE id = $1', [id])
+    return toDetail(fresh[0])
+  }
   return toDetail(rows[0])
 }
 
@@ -120,6 +113,9 @@ export async function createQuotation(body, user) {
 export async function patchQuotation(id, body) {
   const { rows } = await query('SELECT * FROM quotations WHERE id = $1', [id])
   if (rows.length === 0) return null
+  if (!isQuoteEditable(rows[0].status)) {
+    throw httpError(409, 'This quotation can no longer be edited')
+  }
 
   if (body.customerId) {
     const { rows: cRows } = await query('SELECT * FROM customers WHERE id = $1', [body.customerId])
@@ -143,6 +139,13 @@ export async function patchQuotation(id, body) {
 export async function addLine(quotationId, body) {
   const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [quotationId])
   if (qRows.length === 0) return null
+  if (!isQuoteEditable(qRows[0].status)) {
+    throw httpError(409, 'This quotation can no longer be edited')
+  }
+  const qtyParsed = body.qty === undefined ? { value: 1 } : parseQty(body.qty)
+  if (qtyParsed.error) throw httpError(400, qtyParsed.error)
+  const discParsed = body.discountPercent === undefined ? { value: 0 } : parseDiscountPercent(body.discountPercent)
+  if (discParsed.error) throw httpError(400, discParsed.error)
   const { rows: pRows } = await query('SELECT * FROM products WHERE id = $1', [body.productId])
   if (pRows.length === 0) return null
   const product = pRows[0]
@@ -151,7 +154,7 @@ export async function addLine(quotationId, body) {
   await query(
     `INSERT INTO quotation_lines (id, quotation_id, product_id, product_name, category, qty, price, discount_percent, comment)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '')`,
-    [lineId, quotationId, product.id, product.name, product.category, Number(body.qty) || 1, Number(product.price), Number(body.discountPercent) || 0],
+    [lineId, quotationId, product.id, product.name, product.category, qtyParsed.value, Number(product.price), discParsed.value],
   )
 
   await computeAndPersistRisk(quotationId)
@@ -159,15 +162,23 @@ export async function addLine(quotationId, body) {
 }
 
 export async function patchLine(quotationId, lineId, body) {
+  const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [quotationId])
+  if (qRows.length === 0) return null
+  if (!isQuoteEditable(qRows[0].status)) {
+    throw httpError(409, 'This quotation can no longer be edited')
+  }
   const { rows } = await query('SELECT * FROM quotation_lines WHERE id = $1 AND quotation_id = $2', [lineId, quotationId])
   if (rows.length === 0) return null
 
   if (body.discountPercent !== undefined) {
-    const clamped = Math.max(0, Math.min(80, Number(body.discountPercent)))
-    await query('UPDATE quotation_lines SET discount_percent = $1 WHERE id = $2', [clamped, lineId])
+    const parsed = parseDiscountPercent(body.discountPercent)
+    if (parsed.error) throw httpError(400, parsed.error)
+    await query('UPDATE quotation_lines SET discount_percent = $1 WHERE id = $2', [parsed.value, lineId])
   }
   if (body.qty !== undefined) {
-    await query('UPDATE quotation_lines SET qty = $1 WHERE id = $2', [Math.max(1, Number(body.qty)), lineId])
+    const parsed = parseQty(body.qty)
+    if (parsed.error) throw httpError(400, parsed.error)
+    await query('UPDATE quotation_lines SET qty = $1 WHERE id = $2', [parsed.value, lineId])
   }
 
   await computeAndPersistRisk(quotationId)
@@ -175,6 +186,11 @@ export async function patchLine(quotationId, lineId, body) {
 }
 
 export async function deleteLine(quotationId, lineId) {
+  const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [quotationId])
+  if (qRows.length === 0) return null
+  if (!isQuoteEditable(qRows[0].status)) {
+    throw httpError(409, 'This quotation can no longer be edited')
+  }
   await query('DELETE FROM quotation_lines WHERE id = $1 AND quotation_id = $2', [lineId, quotationId])
   await computeAndPersistRisk(quotationId)
   return getQuotation(quotationId)

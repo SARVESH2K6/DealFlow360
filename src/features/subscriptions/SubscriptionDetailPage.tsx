@@ -58,6 +58,7 @@ export function SubscriptionDetailPage() {
     { key: 'nextBillDate', header: 'Next Bill Date', render: (r) => formatDate(r.nextBillDate) },
     { key: 'amount', header: 'Amount', render: (r) => money(r.amount) },
   ]
+  const cancelled = data.status === 'cancelled'
 
   return (
     <Page>
@@ -78,7 +79,9 @@ export function SubscriptionDetailPage() {
       <InfoBanner>
         Recurring lines are invoiced at the start of each billing period, independently of one-time hardware on the originating order.
       </InfoBanner>
-      {editing ? (
+      {cancelled ? (
+        <p className="text-[13px] text-inkMuted">This subscription is cancelled. Invoices already issued are unchanged.</p>
+      ) : editing ? (
         <div className="grid grid-cols-2 gap-4 border border-border bg-surface p-4 md:grid-cols-4">
           <Field label="Plan">
             <input className={inputCls()} value={plan} onChange={(e) => setPlan(e.target.value)} />
@@ -91,7 +94,7 @@ export function SubscriptionDetailPage() {
             </select>
           </Field>
           <Field label="Amount">
-            <input className={inputCls()} type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
+            <input className={inputCls()} type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))} />
           </Field>
           <Field label="Status">
             <select

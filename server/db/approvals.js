@@ -1,5 +1,5 @@
 import { query } from './pool.js'
-import { nextId, computeAndPersistRisk } from './helpers.js'
+import { createFulfillmentFromQuote } from './fulfillment.js'
 
 async function logActivityDb(text) {
   const id = `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -23,19 +23,7 @@ export async function listApprovals() {
     JOIN quotations q ON q.id = a.quotation_id
     ORDER BY a.days_pending DESC
   `)
-  // Recompute risk for each
-  for (const row of rows) {
-    await computeAndPersistRisk(row.quotation_id)
-  }
-  // Re-fetch
-  const { rows: updated } = await query(`
-    SELECT a.id, a.quotation_id, a.status, a.stage, a.assigned_to, a.assigned_role, a.days_pending,
-           q.number AS quotation_number, q.customer_name, q.amount, q.risk_level, q.risk_score, q.blended_risk
-    FROM approvals a
-    JOIN quotations q ON q.id = a.quotation_id
-    ORDER BY a.days_pending DESC
-  `)
-  return updated.map((r) => ({
+  return rows.map((r) => ({
     id: r.id,
     quotationId: r.quotation_id,
     quotationNumber: r.quotation_number,
@@ -57,7 +45,6 @@ export async function getApproval(id) {
   const { rows } = await query('SELECT * FROM approvals WHERE id = $1', [id])
   if (rows.length === 0) return null
   const a = rows[0]
-  await computeAndPersistRisk(a.quotation_id)
 
   // Fetch quotation detail
   const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [a.quotation_id])
@@ -113,6 +100,7 @@ export async function approveApproval(id, user, note) {
   const { rows } = await query('SELECT * FROM approvals WHERE id = $1', [id])
   if (rows.length === 0) return { error: 'Approval not found', status: 404 }
   const a = rows[0]
+  if (a.status !== 'pending') return { error: 'Approval is not pending', status: 409 }
   if (!canActOnStep(user, a)) return { error: 'Not assigned to this step', status: 403 }
 
   const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [a.quotation_id])
@@ -152,13 +140,14 @@ export async function returnApproval(id, user, note) {
   const { rows } = await query('SELECT * FROM approvals WHERE id = $1', [id])
   if (rows.length === 0) return { error: 'Approval not found', status: 404 }
   const a = rows[0]
+  if (a.status !== 'pending') return { error: 'Approval is not pending', status: 409 }
   if (!canActOnStep(user, a)) return { error: 'Not assigned to this step', status: 403 }
 
   const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [a.quotation_id])
   const q = qRows[0]
 
   await query("UPDATE approvals SET status = 'returned', stage = 'submitted', assigned_to = $1 WHERE id = $2", [q.rep_name, id])
-  await query("UPDATE quotations SET status = 'draft' WHERE id = $1", [a.quotation_id])
+  await query("UPDATE quotations SET status = 'returned' WHERE id = $1", [a.quotation_id])
   await appendAuditDb(id, user, 'Returned', note || 'Returned for revision.')
   await logActivityDb(`${q.number} returned for revision by ${user.name}`)
   return { data: await getApproval(id) }
@@ -168,6 +157,7 @@ export async function rejectApproval(id, user, note) {
   const { rows } = await query('SELECT * FROM approvals WHERE id = $1', [id])
   if (rows.length === 0) return { error: 'Approval not found', status: 404 }
   const a = rows[0]
+  if (a.status !== 'pending') return { error: 'Approval is not pending', status: 409 }
   if (!canActOnStep(user, a)) return { error: 'Not assigned to this step', status: 403 }
 
   const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [a.quotation_id])
@@ -178,37 +168,6 @@ export async function rejectApproval(id, user, note) {
   await appendAuditDb(id, user, 'Rejected', note || 'Rejected.')
   await logActivityDb(`${q.number} rejected by ${user.name}`)
   return { data: await getApproval(id) }
-}
-
-// ── Fulfillment creation ─────────────────────────────────────────────
-
-async function createFulfillmentFromQuote(quotationId) {
-  const { rows: existing } = await query('SELECT id FROM fulfillment_orders WHERE quotation_id = $1', [quotationId])
-  if (existing.length > 0) return
-
-  const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [quotationId])
-  const q = qRows[0]
-  const { rows: lineRows } = await query('SELECT * FROM quotation_lines WHERE quotation_id = $1', [quotationId])
-
-  const fId = nextId('f')
-  await query(
-    `INSERT INTO fulfillment_orders (id, quotation_id, order_number, customer_id, customer_name, status, warehouse)
-     VALUES ($1, $2, $3, $4, $5, 'ready', 'East DC')`,
-    [fId, quotationId, q.number.replace('Q-', 'SO-'), q.customer_id, q.customer_name],
-  )
-
-  for (const l of lineRows) {
-    const { rows: flRows } = await query(
-      'INSERT INTO fulfillment_lines (fulfillment_id, product_id, product_name, qty) VALUES ($1, $2, $3, $4) RETURNING id',
-      [fId, l.product_id, l.product_name, Number(l.qty)],
-    )
-    const flId = flRows[0].id
-    const wh = l.category === 'Services' ? 'Services desk' : 'East DC'
-    await query(
-      'INSERT INTO fulfillment_suggested (fulfillment_line_id, warehouse, qty_fulfilled, est_shipments, cost, available) VALUES ($1, $2, $3, 1, $4, 20)',
-      [flId, wh, Number(l.qty), l.category === 'Services' ? 0 : 120],
-    )
-  }
 }
 
 export { createFulfillmentFromQuote }

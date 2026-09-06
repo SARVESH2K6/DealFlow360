@@ -118,17 +118,19 @@ export function useLiveQuery<T>(
 }
 
 export function useDashboard() {
-  return useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => api<DashboardSummary>('/api/dashboard/summary'),
-  })
+  return useLiveQuery<DashboardSummary>(
+    ['dashboard'],
+    () => api<DashboardSummary>('/api/dashboard/summary'),
+    'workspace',
+  )
 }
 
 export function useQuotations() {
-  return useQuery({
-    queryKey: ['quotations'],
-    queryFn: () => api<ListResponse<QuotationListItem>>('/api/quotations'),
-  })
+  return useLiveQuery<ListResponse<QuotationListItem>>(
+    ['quotations'],
+    () => api<ListResponse<QuotationListItem>>('/api/quotations'),
+    'workspace',
+  )
 }
 
 export function useQuotationDetail(id: string | undefined) {
@@ -223,10 +225,11 @@ export function useSubmitQuotation(id: string) {
 }
 
 export function useApprovals() {
-  return useQuery({
-    queryKey: ['approvals'],
-    queryFn: () => api<ListResponse<ApprovalListItem>>('/api/approvals'),
-  })
+  return useLiveQuery<ListResponse<ApprovalListItem>>(
+    ['approvals'],
+    () => api<ListResponse<ApprovalListItem>>('/api/approvals'),
+    'workspace',
+  )
 }
 
 export function useApprovalDetail(id: string | undefined) {

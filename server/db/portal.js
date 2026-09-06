@@ -1,5 +1,5 @@
 import { query } from './pool.js'
-import { nextId, computeAndPersistRisk, requiredApprovalLevel } from './helpers.js'
+import { nextId, computeAndPersistRisk, httpError, parseDiscountPercent } from './helpers.js'
 
 async function logActivityDb(text) {
   const id = `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -15,7 +15,7 @@ async function appendAuditDb(approvalId, user, action, note) {
 
 export async function listPortalQuotes(customerId) {
   const { rows } = await query(
-    "SELECT * FROM quotations WHERE customer_id = $1 AND status NOT IN ('draft', 'pending_approval') ORDER BY date DESC",
+    "SELECT * FROM quotations WHERE customer_id = $1 AND status <> 'draft' ORDER BY date DESC",
     [customerId],
   )
   return rows.map((q) => ({
@@ -57,6 +57,15 @@ export async function negotiate(id, customerId, user, body) {
   const { rows } = await query('SELECT * FROM quotations WHERE id = $1 AND customer_id = $2', [id, customerId])
   if (rows.length === 0) return null
   const q = rows[0]
+  if (q.portal_status === 'confirmed' || q.status === 'confirmed') {
+    throw httpError(409, 'Confirmed quotations cannot be renegotiated')
+  }
+  if (q.status === 'rejected') {
+    throw httpError(409, 'Rejected quotations cannot be renegotiated')
+  }
+  if (q.status === 'draft') {
+    throw httpError(409, 'This quotation has not been sent yet')
+  }
 
   const lines = Array.isArray(body.lines) ? body.lines : []
   for (const incoming of lines) {
@@ -64,7 +73,9 @@ export async function negotiate(id, customerId, user, body) {
       await query('UPDATE quotation_lines SET comment = $1 WHERE id = $2 AND quotation_id = $3', [String(incoming.comment), incoming.id, id])
     }
     if (incoming.counterDiscount !== undefined) {
-      await query('UPDATE quotation_lines SET counter_discount = $1, discount_percent = $1 WHERE id = $2 AND quotation_id = $3', [Number(incoming.counterDiscount), incoming.id, id])
+      const parsed = parseDiscountPercent(incoming.counterDiscount)
+      if (parsed.error) throw httpError(400, parsed.error)
+      await query('UPDATE quotation_lines SET counter_discount = $1, discount_percent = $1 WHERE id = $2 AND quotation_id = $3', [parsed.value, incoming.id, id])
     }
   }
 
@@ -72,23 +83,30 @@ export async function negotiate(id, customerId, user, body) {
     await query('UPDATE quotations SET requested_delivery_date = $1 WHERE id = $2', [body.requestedDeliveryDate, id])
   }
 
-  await query("UPDATE quotations SET status = 'negotiation', portal_status = 'under_negotiation' WHERE id = $1", [id])
   await computeAndPersistRisk(id)
 
-  // Ensure approval exists
+  const keepPending = q.status === 'pending_approval'
+  if (!keepPending) {
+    await query("UPDATE quotations SET status = 'negotiation', portal_status = 'under_negotiation' WHERE id = $1", [id])
+  } else {
+    await query("UPDATE quotations SET portal_status = 'under_negotiation' WHERE id = $1", [id])
+  }
+
   const { rows: aRows } = await query('SELECT * FROM approvals WHERE quotation_id = $1', [id])
   let approval
   if (aRows.length === 0) {
     const aId = nextId('a')
     await query(
       `INSERT INTO approvals (id, quotation_id, status, stage, assigned_to, assigned_role, days_pending)
-       VALUES ($1, $2, 'returned', 'negotiation', $3, 'rep', 0)`,
-      [aId, id, q.rep_name || 'Unassigned'],
+       VALUES ($1, $2, $3, $4, $5, $6, 0)`,
+      [aId, id, keepPending ? 'pending' : 'returned', keepPending ? 'sales_manager' : 'negotiation', q.rep_name || 'Unassigned', keepPending ? 'manager' : 'rep'],
     )
     approval = { id: aId }
   } else {
     approval = aRows[0]
-    await query("UPDATE approvals SET status = 'returned', stage = 'negotiation', assigned_to = $2, assigned_role = 'rep' WHERE id = $1", [approval.id, q.rep_name || 'Unassigned'])
+    if (!keepPending) {
+      await query("UPDATE approvals SET status = 'returned', stage = 'negotiation', assigned_to = $2, assigned_role = 'rep' WHERE id = $1", [approval.id, q.rep_name || 'Unassigned'])
+    }
   }
 
   const { rows: qUpdated } = await query('SELECT requested_delivery_date FROM quotations WHERE id = $1', [id])
@@ -112,11 +130,21 @@ export async function confirmPortalQuote(id, customerId, user) {
   const { rows } = await query('SELECT * FROM quotations WHERE id = $1 AND customer_id = $2', [id, customerId])
   if (rows.length === 0) return null
   const q = rows[0]
+  if (q.status === 'pending_approval') {
+    throw httpError(409, 'This quotation is still awaiting internal approval')
+  }
+  if (q.portal_status === 'confirmed' || q.status === 'confirmed') {
+    throw httpError(409, 'Quotation is already confirmed')
+  }
+  if (q.status === 'rejected') {
+    throw httpError(409, 'Rejected quotations cannot be confirmed')
+  }
 
   await query("UPDATE quotations SET status = 'confirmed', portal_status = 'confirmed' WHERE id = $1", [id])
-  // Create fulfillment
-  const { createFulfillmentFromQuote } = await import('./approvals.js')
+  const { createFulfillmentFromQuote } = await import('./fulfillment.js')
   await createFulfillmentFromQuote(id)
+  const { createSubscriptionFromQuote } = await import('./subscriptions.js')
+  await createSubscriptionFromQuote(id)
 
   const { rows: aRows } = await query('SELECT * FROM approvals WHERE quotation_id = $1', [id])
   if (aRows.length > 0) {
@@ -158,10 +186,12 @@ export async function createPortalQuote(user, lines) {
 
   for (const l of lines) {
     const lineId = nextId('l')
+    const qtyParsed = Number(l.qty)
+    if (!Number.isFinite(qtyParsed) || qtyParsed < 1) throw httpError(400, 'Quantity must be at least 1')
     await query(
       `INSERT INTO quotation_lines (id, quotation_id, product_id, product_name, category, qty, price, discount_percent, comment)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 0, '')`,
-      [lineId, id, l.productId, l.productName, l.category || 'Hardware', Number(l.qty) || 1, Number(l.price)],
+      [lineId, id, l.productId, l.productName, l.category || 'Hardware', qtyParsed, Number(l.price)],
     )
   }
 

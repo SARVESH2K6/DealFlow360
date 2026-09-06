@@ -52,8 +52,8 @@ export function PortalQuotesListPage() {
     <Page>
       <PageHeader
         title="My Quotations"
-        action={
-          <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+        actions={
+          <Button variant="commit" onClick={() => setIsModalOpen(true)}>
             Create Request
           </Button>
         }
@@ -77,7 +77,7 @@ export function PortalQuotesListPage() {
             <div className="flex-1 overflow-y-auto mb-4 border border-slate-200 dark:border-slate-700 p-4 rounded-lg">
               <h3 className="font-semibold mb-2 text-slate-800 dark:text-slate-200">Available Products</h3>
               <div className="space-y-2 mb-6">
-                {productsData?.map((p) => (
+                {productsData?.items?.map((p) => (
                   <div key={p.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 p-2 rounded">
                     <div>
                       <div className="font-medium text-slate-800 dark:text-slate-200">{p.name}</div>

@@ -60,7 +60,7 @@ export function FulfillmentDetailPage() {
         actions={<Badge status={view.status}>{quotationStatusLabel(view.status)}</Badge>}
       />
 
-      {view.canConsolidate ? (
+      {view.canConsolidate && canSplit ? (
         <div className="flex items-center justify-between gap-6 border-l-[3px] border-warn bg-warnBg/40 px-4 py-3">
           <p className="text-[13px] leading-relaxed text-warn">
             Stock has arrived. Consolidate remaining backorder
@@ -103,8 +103,10 @@ export function FulfillmentDetailPage() {
                       <input
                         className={inputCls('w-20')}
                         type="number"
+                        min={0}
+                        step="1"
                         value={row.qtyFulfilled}
-                        onChange={(e) => updateQty(lineIdx, rowIdx, Number(e.target.value))}
+                        onChange={(e) => updateQty(lineIdx, rowIdx, Math.max(0, Number(e.target.value) || 0))}
                       />
                     ) : (
                       <span className="font-serif text-[15px] tabular-nums">{row.qtyFulfilled}</span>

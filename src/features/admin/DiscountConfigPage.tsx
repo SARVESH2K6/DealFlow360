@@ -4,6 +4,7 @@ import { InfoBanner } from '../../components/ui/InfoBanner'
 import { ErrorState, Page, PageHeader, TableSkeleton, inputCls } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/Toast'
 import { canEditDiscountConfig, useAuth } from '../../lib/auth'
+import { blockNegativeKey } from '../../lib/numericInput'
 import { useDiscountConfig, useSaveDiscountConfig } from '../../lib/hooks'
 import type { DiscountConfig } from '../../lib/types'
 
@@ -65,13 +66,17 @@ export function DiscountConfigPage() {
                     <input
                       className={inputCls('w-20')}
                       type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
                       disabled={!canEdit}
                       value={row.maxDiscount}
+                      onKeyDown={blockNegativeKey}
                       onChange={(e) => {
                         const next = [...config.tierDiscounts]
                         const cur = next[i]
                         if (!cur) return
-                        next[i] = { ...cur, maxDiscount: Number(e.target.value) }
+                        next[i] = { ...cur, maxDiscount: Math.max(0, Number(e.target.value) || 0) }
                         setConfig({ ...config, tierDiscounts: next })
                       }}
                     />
@@ -98,13 +103,17 @@ export function DiscountConfigPage() {
                     <input
                       className={inputCls('w-20')}
                       type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
                       disabled={!canEdit}
                       value={row.maxDiscount}
+                      onKeyDown={blockNegativeKey}
                       onChange={(e) => {
                         const next = [...config.categoryCeilings]
                         const cur = next[i]
                         if (!cur) return
-                        next[i] = { ...cur, maxDiscount: Number(e.target.value) }
+                        next[i] = { ...cur, maxDiscount: Math.max(0, Number(e.target.value) || 0) }
                         setConfig({ ...config, categoryCeilings: next })
                       }}
                     />
@@ -157,9 +166,10 @@ export function DiscountConfigPage() {
       ) : null}
 
       <InfoBanner>
-        When a quote crosses categories with different ceilings, the system computes a blended risk score and
-        routes using this approval chain: Within limit needs no approval, medium routes to Sales Manager, and high
-        routes to Sales Manager then Finance. Changing the routing values is what the risk engine uses.
+        Blended risk is the weighted sum of each line&apos;s discount over its own ceiling. A score of 0 (within
+        every ceiling) needs no approval. Scores at or above the medium threshold route using the Sales Manager
+        row; scores at or above the high threshold use the Finance row. Those routing values are what the engine
+        reads.
       </InfoBanner>
     </Page>
   )
