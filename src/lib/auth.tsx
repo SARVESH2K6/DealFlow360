@@ -6,7 +6,14 @@ interface AuthContextValue {
   user: User | null
   token: string | null
   login: (email: string, password: string) => Promise<User>
-  signup: (email: string, password: string, name: string) => Promise<User>
+  signup: (
+    email: string,
+    password: string,
+    name: string,
+    companyName?: string,
+    region?: string,
+    city?: string,
+  ) => Promise<User>
   logout: () => void
 }
 
@@ -45,10 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signup = useCallback(
-    async (email: string, password: string, name: string) => {
+    async (
+      email: string,
+      password: string,
+      name: string,
+      companyName?: string,
+      region?: string,
+      city?: string,
+    ) => {
       const auth = await api<AuthResponse>('/api/auth/signup', {
         method: 'POST',
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, companyName, region, city }),
       })
       return applyAuth(auth)
     },

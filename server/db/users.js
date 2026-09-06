@@ -54,15 +54,17 @@ export async function findByEmail(email) {
   return rows[0] || null
 }
 
-export async function createCustomerUser(email, password, name) {
+export async function createCustomerUser(email, password, name, companyName, region, city) {
   const customerId = `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
   const userId = `u-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-  const customerName = `${name} (portal)`
+  const cName = companyName ? companyName.trim() : `${name} (portal)`
+  const cRegion = region ? region.trim() : 'North America'
+  const cCity = city ? city.trim() : null
   const hashed = hashPassword(password)
 
   await query(
-    `INSERT INTO customers (id, name, tier, region, terms) VALUES ($1, $2, 'Bronze', 'North America', 'Net 30')`,
-    [customerId, customerName],
+    `INSERT INTO customers (id, name, tier, region, city, terms) VALUES ($1, $2, 'Bronze', $3, $4, 'Net 30')`,
+    [customerId, cName, cRegion, cCity],
   )
   await query(
     `INSERT INTO users (id, email, password, name, role, customer_id) VALUES ($1, $2, $3, $4, 'customer', $5)`,

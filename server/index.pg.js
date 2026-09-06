@@ -113,12 +113,16 @@ app.post('/api/auth/signup', wrap(async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase()
   const password = String(req.body?.password || '')
   const name = String(req.body?.name || '').trim()
+  const companyName = String(req.body?.companyName || '').trim()
+  const region = String(req.body?.region || '').trim()
+  const city = String(req.body?.city || '').trim()
+  
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
   if (name.length < 2) return res.status(400).json({ error: 'Name is required' })
   const existing = await usersDb.findByEmail(email)
   if (existing) return res.status(409).json({ error: 'An account with that email already exists' })
   
-  const user = await usersDb.createCustomerUser(email, password, name)
+  const user = await usersDb.createCustomerUser(email, password, name, companyName, region, city)
   res.status(201).json(signUser(user))
 }))
 

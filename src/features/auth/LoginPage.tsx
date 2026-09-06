@@ -12,6 +12,9 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [region, setRegion] = useState('')
+  const [city, setCity] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -26,7 +29,7 @@ export function LoginPage() {
     setNotice(null)
     setLoading(true)
     try {
-      const next = mode === 'login' ? await login(email, password) : await signup(email, password, name)
+      const next = mode === 'login' ? await login(email, password) : await signup(email, password, name, companyName, region, city)
       navigate(isInternal(next.role) ? '/app/dashboard' : '/portal/quotes')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to sign in')
@@ -115,6 +118,41 @@ export function LoginPage() {
                     required={mode === 'signup'}
                     tabIndex={mode === 'signup' ? 0 : -1}
                     autoComplete="name"
+                  />
+                </Field>
+                <Field label="Company Name">
+                  <input
+                    className={inputCls()}
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required={mode === 'signup'}
+                    tabIndex={mode === 'signup' ? 0 : -1}
+                    autoComplete="organization"
+                  />
+                </Field>
+                <Field label="Region">
+                  <select
+                    className={inputCls()}
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                    required={mode === 'signup'}
+                    tabIndex={mode === 'signup' ? 0 : -1}
+                  >
+                    <option value="">Select a region</option>
+                    <option value="North America">North America</option>
+                    <option value="South America">South America</option>
+                    <option value="EMEA">EMEA</option>
+                    <option value="APAC">APAC</option>
+                  </select>
+                </Field>
+                <Field label="City">
+                  <input
+                    className={inputCls()}
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required={mode === 'signup'}
+                    tabIndex={mode === 'signup' ? 0 : -1}
+                    autoComplete="address-level2"
                   />
                 </Field>
               </div>
