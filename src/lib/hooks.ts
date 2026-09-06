@@ -391,7 +391,7 @@ export function useCreateProduct() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: Partial<Product>) =>
-      api<Product>('/api/products', { method: 'POST', body: JSON.stringify(body) }),
+      api<ProductDetailPayload>('/api/products', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['products'] }),
   })
 }

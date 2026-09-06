@@ -44,7 +44,7 @@ export function ProductsListPage() {
                 description: '',
                 isSubscription: false,
               })
-              navigate(`/app/products/${p.id}`)
+              navigate(`/app/products/${p.product.id}`)
             }}
           >
             + New Product
