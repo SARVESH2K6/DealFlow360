@@ -443,6 +443,12 @@ app.get('/api/portal/quote/:id', auth, requireRoles(['customer']), wrap(async (r
   res.json(data)
 }))
 
+app.get('/api/portal/quote/:id/invoice', auth, requireRoles(['customer']), wrap(async (req, res) => {
+  const data = await portalDb.getPortalInvoice(req.params.id, req.user.customerId)
+  if (!data) return res.status(404).json({ error: 'Not found' })
+  res.json(data)
+}))
+
 app.post('/api/portal/quote/:id/negotiate', auth, requireRoles(['customer']), wrap(async (req, res) => {
   const result = await portalDb.negotiate(req.params.id, req.user.customerId, req.user, req.body)
   if (!result) return res.status(404).json({ error: 'Not found' })

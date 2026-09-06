@@ -6,7 +6,8 @@ import { InfoBanner } from '../../components/ui/InfoBanner'
 import { ErrorState, Field, Page, PageHeader, TableSkeleton, inputCls } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/Toast'
 import { moneyExact, quotationStatusLabel } from '../../lib/format'
-import { usePortalConfirm, usePortalNegotiate, usePortalQuote } from '../../lib/hooks'
+import { downloadInvoicePdf } from '../../lib/invoicePdf'
+import { usePortalConfirm, usePortalNegotiate, usePortalQuote, usePortalInvoice } from '../../lib/hooks'
 import { blockNegativeKey, sanitizeNonNegative } from '../../lib/numericInput'
 import type { PortalQuoteLine } from '../../lib/types'
 
@@ -16,6 +17,7 @@ export function PortalQuotePage() {
   const { data, isLoading, isError, error } = usePortalQuote(id)
   const negotiate = usePortalNegotiate(id ?? '')
   const confirm = usePortalConfirm(id ?? '')
+  const { data: invoice } = usePortalInvoice(id)
   const [lines, setLines] = useState<PortalQuoteLine[]>([])
   const [delivery, setDelivery] = useState('')
 
@@ -165,6 +167,11 @@ export function PortalQuotePage() {
         >
           Confirm Quotation
         </Button>
+        {invoice && (
+          <Button variant="secondary" onClick={() => downloadInvoicePdf(invoice)}>
+            Download Invoice ({invoice.status})
+          </Button>
+        )}
       </div>
     </Page>
   )

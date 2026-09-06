@@ -17,8 +17,7 @@ export async function getDashboardSummary() {
   const { rows: oRows } = await query("SELECT COUNT(*) AS cnt FROM quotations WHERE status IN ('draft', 'pending_approval', 'negotiation')")
   const openQuotations = Number(oRows[0]?.cnt || 0)
 
-  const { rows: dRows } = await query('SELECT * FROM deal_health')
-  const atRiskDeals = dRows.length
+  const atRiskDeals = 0
 
   const { rows: totalRows } = await query('SELECT SUM(amount) AS total FROM quotations')
   const totalDealValue = Number(totalRows[0]?.total || 0)

@@ -451,6 +451,15 @@ export function usePortalQuote(id: string | undefined) {
   )
 }
 
+export function usePortalInvoice(id: string | undefined) {
+  return useQuery({
+    queryKey: ['portal-quote-invoice', id],
+    queryFn: () => api<Invoice>(`/api/portal/quote/${id}/invoice`),
+    enabled: Boolean(id),
+    retry: false,
+  })
+}
+
 export function usePortalNegotiate(id: string) {
   const qc = useQueryClient()
   return useMutation({

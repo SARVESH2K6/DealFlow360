@@ -55,6 +55,15 @@ export async function getPortalQuote(id, customerId) {
   }
 }
 
+export async function getPortalInvoice(quotationId, customerId) {
+  const { rows } = await query('SELECT * FROM quotations WHERE id = $1 AND customer_id = $2', [quotationId, customerId])
+  if (rows.length === 0) return null
+  const { rows: invRows } = await query('SELECT id FROM invoices WHERE quotation_id = $1', [quotationId])
+  if (invRows.length === 0) return null
+  const { getInvoice } = await import('./invoices.js')
+  return getInvoice(invRows[0].id)
+}
+
 export async function negotiate(id, customerId, user, body) {
   const { rows } = await query('SELECT * FROM quotations WHERE id = $1 AND customer_id = $2', [id, customerId])
   if (rows.length === 0) return null
