@@ -82,16 +82,6 @@ Once approved internally, customers log into their dedicated portal to view the 
 Upon confirmation:
 - **Fulfillment**: Orders are split across warehouses, with logic to handle low stock.
 - **Subscriptions**: Recurring products generate subscription ledgers and periodic invoices.
-
-### 6. Health & Analytics
-The system tracks "Deal Health," flagging stalled deals, discount anomalies, and delivery slippages to help managers coach reps and rescue at-risk deals.
-
 ---
 
-### 💻 Two-Laptop Live Demo Example
-
-Want to see the real-time negotiation in action?
-
-1. **Laptop A (Manager)**: Log in as `olivia.t@example.org`. Open **Approvals** → **Q-1045 Acme Corp**.
-2. **Laptop B (Customer)**: Log in as `marco.r@example.org`. Open **Q-1045**, change a counter discount, and click **Submit Request**.
-3. **Observation**: Laptop A updates instantly via WebSockets (with a 3-second polling fallback) to reflect the customer's changes.
+### Demo video link: https://youtu.be/67LFpvnY8jQ
