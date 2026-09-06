@@ -87,7 +87,7 @@ export function DashboardPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
 
       {data ? (
-        <div className="grid grid-cols-3 gap-px bg-bronze/30">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-bronze/30">
           <Metric label="Pending Approvals" value={String(data.pendingApprovals)} />
           <Metric label="Open Quotations" value={String(data.openQuotations)} />
           <Metric label="At Risk Deals" value={String(data.atRiskDeals)} />

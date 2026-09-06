@@ -50,16 +50,16 @@ export function TopNav({ role }: TopNavProps) {
   return (
     <header className="sticky top-0 z-20 bg-sheet">
       <div className="rule-double" />
-      <div className="flex h-16 items-center justify-between px-10">
-        <div className="flex items-center gap-10">
-          <span className="font-serif text-[20px] tracking-tight text-commit">DealFlow360</span>
-          <nav className="flex items-center gap-7">
+      <div className="flex h-16 items-center justify-between px-4 sm:px-10">
+        <div className="flex flex-1 items-center gap-4 sm:gap-10 overflow-hidden">
+          <span className="shrink-0 font-serif text-[18px] sm:text-[20px] tracking-tight text-commit">DealFlow360</span>
+          <nav className="flex items-center gap-4 sm:gap-7 overflow-x-auto whitespace-nowrap hide-scrollbar">
             {tabs.map((tab) => (
               <NavLink
                 key={tab.to}
                 to={tab.to}
                 className={({ isActive }) =>
-                  `text-[12px] uppercase tracking-[0.12em] transition-colors duration-150 ${
+                  `text-[11px] sm:text-[12px] uppercase tracking-[0.12em] transition-colors duration-150 ${
                     isActive ? 'text-ink' : 'text-inkMuted hover:text-ink'
                   }`
                 }
@@ -69,8 +69,8 @@ export function TopNav({ role }: TopNavProps) {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-5">
-          <span className="text-[13px] text-inkMuted">
+        <div className="flex shrink-0 items-center gap-3 sm:gap-5 ml-4">
+          <span className="hidden sm:inline text-[13px] text-inkMuted">
             {user?.name}
             <span className="ml-2 text-[10px] font-medium uppercase tracking-[0.14em] text-inkFaint">
               {user?.role}
@@ -78,7 +78,7 @@ export function TopNav({ role }: TopNavProps) {
           </span>
           <button
             type="button"
-            className="text-[12px] uppercase tracking-[0.12em] text-inkMuted transition-colors duration-150 hover:text-ink"
+            className="text-[11px] sm:text-[12px] uppercase tracking-[0.12em] text-inkMuted transition-colors duration-150 hover:text-ink"
             onClick={() => {
               logout()
               navigate('/login')

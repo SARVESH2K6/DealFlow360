@@ -50,7 +50,7 @@ export function ProductDetailPage() {
   return (
     <Page>
       <PageHeader title={form.name} />
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="space-y-3 rounded-md border border-border bg-surface p-4">
           <h2 className="text-[15px] font-medium text-ink">General info</h2>
           <Field label="Product Name">

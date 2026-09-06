@@ -80,7 +80,7 @@ export function ApprovalDetailPage() {
         title={`${data.quotation.number} · ${data.customerName}`}
         actions={<Badge status={data.status}>{data.status}</Badge>}
       />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard label="Blended Risk" value={data.riskLevel} sublabel={`Score ${data.riskScore} · ${data.blendedRisk} blended`} tone={data.riskLevel === 'HIGH' ? 'danger' : data.riskLevel === 'MEDIUM' ? 'warn' : 'ok'} />
         <StatCard label="Customer Tier" value={data.customerTier} sublabel={money(data.amount)} />
       </div>

@@ -60,40 +60,42 @@ export function DataTable<T>({
   return (
     <div className="w-full">
       <div className="rule-double mb-1" />
-      <table className="w-full border-collapse text-left">
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => onHeader(col)}
-                className={`h-11 pr-6 text-[10px] font-medium uppercase tracking-[0.14em] text-inkMuted ${col.sortable ? 'cursor-pointer select-none' : ''} ${col.align === 'right' ? 'text-right' : ''} ${col.className ?? ''}`}
-              >
-                {col.header}
-                {sortKey === col.key ? (dir === 'asc' ? ' ↑' : ' ↓') : ''}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row) => (
-            <tr
-              key={rowKey(row)}
-              onClick={() => onRowClick?.(row)}
-              className={`border-b border-ink/[0.08] transition-colors duration-150 last:border-b-0 ${onRowClick ? 'cursor-pointer hover:bg-surfaceAlt/70' : ''}`}
-            >
+      <div className="overflow-x-auto w-full hide-scrollbar">
+        <table className="w-full border-collapse text-left min-w-max">
+          <thead>
+            <tr>
               {columns.map((col) => (
-                <td
+                <th
                   key={col.key}
-                  className={`h-14 pr-6 text-[14px] text-ink ${col.align === 'right' ? 'text-right font-serif text-[17px] tabular-nums' : ''} ${col.className ?? ''}`}
+                  onClick={() => onHeader(col)}
+                  className={`h-11 pr-6 text-[10px] font-medium uppercase tracking-[0.14em] text-inkMuted ${col.sortable ? 'cursor-pointer select-none' : ''} ${col.align === 'right' ? 'text-right' : ''} ${col.className ?? ''}`}
                 >
-                  {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}
-                </td>
+                  {col.header}
+                  {sortKey === col.key ? (dir === 'asc' ? ' ↑' : ' ↓') : ''}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr
+                key={rowKey(row)}
+                onClick={() => onRowClick?.(row)}
+                className={`border-b border-ink/[0.08] transition-colors duration-150 last:border-b-0 ${onRowClick ? 'cursor-pointer hover:bg-surfaceAlt/70' : ''}`}
+              >
+                {columns.map((col) => (
+                  <td
+                    key={col.key}
+                    className={`h-14 pr-6 text-[14px] text-ink ${col.align === 'right' ? 'text-right font-serif text-[17px] tabular-nums' : ''} ${col.className ?? ''}`}
+                  >
+                    {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="rule-double mt-1" />
     </div>
   )

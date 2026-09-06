@@ -59,7 +59,7 @@ export function DealHealthPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard label="Stalled Deals" value={data.stalled} tone="warn" />
             <StatCard label="Discount Anomalies" value={data.anomalies} tone="danger" />
             <StatCard label="Delivery Slippage" value={data.slippage} />

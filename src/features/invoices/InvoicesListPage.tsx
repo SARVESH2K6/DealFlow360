@@ -36,7 +36,7 @@ export function InvoicesListPage() {
       {isLoading ? <TableSkeleton /> : null}
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(['unpaid', 'paid'] as const).map((s) => (
             <StatCard
               key={s}

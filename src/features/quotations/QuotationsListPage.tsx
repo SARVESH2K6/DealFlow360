@@ -84,7 +84,7 @@ export function QuotationsListPage() {
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
 
       {data ? (
-        <div className="grid grid-cols-4 gap-px bg-bronze/30 lg:grid-cols-7">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-bronze/30 lg:grid-cols-7">
           {FILTERS.map((f) => {
             const subset = items.filter((q) => q.status === f.key)
             const total = subset.reduce((s, q) => s + q.amount, 0)

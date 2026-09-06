@@ -66,7 +66,7 @@ export function SubscriptionDetailPage() {
         title={`${data.customerName} · ${data.plan}`}
         actions={<Badge status={data.status}>{data.status}</Badge>}
       />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <section>
           <h2 className="mb-2 font-serif text-[18px] text-ink">One-time lines</h2>
           <DataTable columns={oneTimeCols} rows={data.oneTimeLines} rowKey={(r) => r.productName} emptyMessage="No one-time lines." />
@@ -82,7 +82,7 @@ export function SubscriptionDetailPage() {
       {cancelled ? (
         <p className="text-[13px] text-inkMuted">This subscription is cancelled. Invoices already issued are unchanged.</p>
       ) : editing ? (
-        <div className="grid grid-cols-2 gap-4 border border-border bg-surface p-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-border bg-surface p-4 md:grid-cols-4">
           <Field label="Plan">
             <input className={inputCls()} value={plan} onChange={(e) => setPlan(e.target.value)} />
           </Field>

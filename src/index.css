@@ -79,3 +79,13 @@ input[type='number']::-webkit-outer-spin-button {
   background-size: 220% 100%;
   animation: ledger-shimmer 1.5s ease-in-out infinite;
 }
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

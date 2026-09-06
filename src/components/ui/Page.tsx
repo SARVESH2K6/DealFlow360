@@ -16,7 +16,7 @@ export function TableSkeleton({ rows = 6 }: { rows?: number }) {
 
 export function StatRowSkeleton() {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div className="bg-surfaceAlt/50 px-4 py-4">
         <div className="ledger-shimmer" />
       </div>
@@ -38,7 +38,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, kicker, actions }: PageHeaderProps) {
   return (
-    <div className="flex items-end justify-between gap-4">
+    <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
       <div>
         {kicker ? (
           <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.16em] text-bronze">{kicker}</p>
@@ -56,7 +56,7 @@ export function Page({ children }: { children: ReactNode }) {
 
 export function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="mb-2 flex items-end justify-between gap-4">
+    <div className="mb-2 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
       <h2 className="font-serif text-[18px] text-ink">{children}</h2>
       {aside}
     </div>

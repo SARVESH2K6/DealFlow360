@@ -26,7 +26,7 @@ export function ReportsPage() {
           </>
         }
       />
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Field label="Period">
           <select className={inputCls()} value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option>Q3 2026</option>
@@ -59,7 +59,7 @@ export function ReportsPage() {
       {isLoading ? <StatRowSkeleton /> : null}
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard label="Quotes Created" value={data.quotesCreated} />
           <StatCard label="Avg Approval Time" value={data.avgApprovalTime} />
           <StatCard label="Top Upsell Product" value={data.topUpsellProduct} />

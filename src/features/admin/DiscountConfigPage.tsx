@@ -48,7 +48,7 @@ export function DiscountConfigPage() {
           ) : null
         }
       />
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <section>
           <h2 className="mb-2 font-serif text-[18px] text-ink">Tier discounts</h2>
           <table className="w-full text-left">

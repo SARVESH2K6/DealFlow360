@@ -63,7 +63,7 @@ export function ApprovalsListPage() {
       {isLoading ? <TableSkeleton /> : null}
       {isError ? <ErrorState message={error instanceof Error ? error.message : 'Failed to load'} /> : null}
       {data ? (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(['pending', 'returned', 'approved'] as const).map((s) => {
             const subset = items.filter((i) => i.status === s)
             return (

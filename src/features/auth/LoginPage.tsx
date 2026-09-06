@@ -63,7 +63,7 @@ export function LoginPage() {
         </div>
         <p className="mt-1 text-[13px] text-inkMuted">Private operations ledger. Restricted access.</p>
 
-        <div className="relative mt-4 grid grid-cols-2 border border-bronze/50">
+        <div className="relative mt-4 grid grid-cols-1 sm:grid-cols-2 border border-bronze/50">
           <span
             aria-hidden
             className={`absolute inset-y-0 w-1/2 bg-ink transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
