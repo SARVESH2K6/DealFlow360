@@ -277,6 +277,9 @@ app.post('/api/quotations/:id/submit', auth, requireRoles(INTERNAL), wrap(async 
     await actDb.logActivity(`${q.customerName} quotation ${q.number} submitted for approval`)
   }
   
+  const { calculateEstimatedDelivery } = await import('./db/fulfillment.js')
+  await calculateEstimatedDelivery(q.id)
+  
   await emitOrder(q.id)
   
   // Re-fetch to return latest state

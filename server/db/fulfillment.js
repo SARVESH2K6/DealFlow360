@@ -127,6 +127,94 @@ export async function getFulfillmentOrder(id) {
   return withMeta(order, canConsolidate, remainingQty)
 }
 
+const CITY_COORDS = {
+  'Mumbai': { lat: 19.0760, lon: 72.8777 },
+  'Rajkot': { lat: 22.3039, lon: 70.8022 },
+  'Ahmedabad': { lat: 23.0225, lon: 72.5714 },
+  'Jodhpur': { lat: 26.2389, lon: 73.0243 },
+  'Anand': { lat: 22.5645, lon: 72.9289 },
+  'Pune': { lat: 18.5204, lon: 73.8567 },
+  'Surat': { lat: 21.1702, lon: 72.8311 },
+  'Nagpur': { lat: 21.1458, lon: 79.0882 },
+  'Vadodara': { lat: 22.3072, lon: 73.1812 },
+  'Gandhinagar': { lat: 23.2156, lon: 72.6369 }
+};
+
+function getDistanceHaversine(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+async function getRoutingDistance(city1, city2) {
+  const c1 = CITY_COORDS[city1];
+  const c2 = CITY_COORDS[city2];
+  if (!c1 || !c2) return 9999;
+  
+  try {
+    const url = `http://router.project-osrm.org/route/v1/driving/${c1.lon},${c1.lat};${c2.lon},${c2.lat}?overview=false`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes.length > 0) {
+      return data.routes[0].distance / 1000;
+    }
+  } catch (err) {
+    console.error("OSRM fetch error, falling back to Haversine", err);
+  }
+  return getDistanceHaversine(c1.lat, c1.lon, c2.lat, c2.lon);
+}
+
+export async function calculateEstimatedDelivery(quotationId) {
+  const { rows: qRows } = await query('SELECT * FROM quotations WHERE id = $1', [quotationId])
+  if (qRows.length === 0) return 0
+  const q = qRows[0]
+  
+  const { rows: custRows } = await query('SELECT city FROM customers WHERE id = $1', [q.customer_id])
+  const customerCity = custRows[0]?.city || 'Ahmedabad'
+
+  const { rows: lineRows } = await query('SELECT * FROM quotation_lines WHERE quotation_id = $1', [quotationId])
+  
+  let totalEstimatedCost = 0;
+  for (const l of lineRows) {
+    if (l.category === 'Services') continue;
+    
+    const { rows: stockRows } = await query(
+      'SELECT warehouse, (in_stock - reserved) AS available FROM stock WHERE product_id = $1 AND (in_stock - reserved) > 0',
+      [l.product_id]
+    )
+
+    const warehouses = [];
+    for (const w of stockRows) {
+      const distance = await getRoutingDistance(w.warehouse, customerCity);
+      warehouses.push({ warehouse: w.warehouse, available: Number(w.available), distance });
+    }
+
+    warehouses.sort((a, b) => {
+      if (a.distance !== b.distance) return a.distance - b.distance;
+      return b.available - a.available;
+    });
+
+    let remainingQty = Number(l.qty);
+    for (const w of warehouses) {
+      if (remainingQty <= 0) break;
+      const take = Math.min(remainingQty, w.available);
+      const costPerKm = 0.5;
+      const cost = Math.round(w.distance * costPerKm);
+      totalEstimatedCost += cost;
+      remainingQty -= take;
+    }
+  }
+
+  await query('UPDATE quotations SET estimated_delivery_cost = $1 WHERE id = $2', [totalEstimatedCost, quotationId]);
+  return totalEstimatedCost;
+}
+
 export async function createFulfillmentFromQuote(quotationId) {
   const { rows: existing } = await query('SELECT id FROM fulfillment_orders WHERE quotation_id = $1', [quotationId])
   if (existing.length > 0) return getFulfillmentOrder(existing[0].id)
@@ -138,72 +226,91 @@ export async function createFulfillmentFromQuote(quotationId) {
 
   const fId = nextId('f')
   let status = 'ready'
-  let primaryWarehouse = 'East DC'
-  const planned = []
-
-  for (const l of lineRows) {
-    const qty = Number(l.qty)
-    if (l.category === 'Services') {
-      planned.push({
-        productId: l.product_id,
-        productName: l.product_name,
-        qty,
-        suggested: [
-          { warehouse: 'Services desk', qtyFulfilled: qty, estShipments: 1, cost: 0, available: qty },
-        ],
-      })
-      continue
-    }
-
-    const stock = await productAvailability(l.product_id)
-    const totalAvail = stock.reduce((n, s) => n + s.available, 0)
-    let remaining = qty
-    const suggested = []
-    for (const s of stock) {
-      if (remaining <= 0) break
-      const take = Math.min(remaining, s.available)
-      if (take <= 0) continue
-      suggested.push({
-        warehouse: s.warehouse,
-        qtyFulfilled: take,
-        estShipments: 1,
-        cost: 120,
-        available: s.available,
-      })
-      await query(
-        'UPDATE stock SET reserved = reserved + $1 WHERE warehouse = $2 AND product_id = $3',
-        [take, s.warehouse, l.product_id],
-      )
-      remaining -= take
-    }
-
-    if (remaining > 0) status = 'backorder'
-    else if (suggested.length > 1 && status === 'ready') status = 'split_pending'
-
-    if (suggested[0]) primaryWarehouse = suggested[0].warehouse
-    planned.push({ productId: l.product_id, productName: l.product_name, qty, suggested })
-  }
-
+  
   await query(
     `INSERT INTO fulfillment_orders (id, quotation_id, order_number, customer_id, customer_name, status, warehouse)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [fId, quotationId, q.number.replace('Q-', 'SO-'), q.customer_id, q.customer_name, status, primaryWarehouse],
+    [fId, quotationId, q.number.replace('Q-', 'SO-'), q.customer_id, q.customer_name, status, 'Multiple'],
   )
 
-  for (const line of planned) {
+  const { rows: custRows } = await query('SELECT city FROM customers WHERE id = $1', [q.customer_id])
+  const customerCity = custRows[0]?.city || 'Ahmedabad'
+  
+  let splitPending = false;
+  let hasBackorder = false;
+
+  for (const l of lineRows) {
     const { rows: flRows } = await query(
       'INSERT INTO fulfillment_lines (fulfillment_id, product_id, product_name, qty) VALUES ($1, $2, $3, $4) RETURNING id',
-      [fId, line.productId, line.productName, line.qty],
+      [fId, l.product_id, l.product_name, Number(l.qty)],
     )
     const flId = flRows[0].id
-    for (const s of line.suggested) {
+
+    if (l.category === 'Services') {
       await query(
-        'INSERT INTO fulfillment_suggested (fulfillment_line_id, warehouse, qty_fulfilled, est_shipments, cost, available) VALUES ($1, $2, $3, $4, $5, $6)',
-        [flId, s.warehouse, s.qtyFulfilled, s.estShipments, s.cost, s.available],
+        'INSERT INTO fulfillment_suggested (fulfillment_line_id, warehouse, qty_fulfilled, est_shipments, cost, available) VALUES ($1, $2, $3, 1, 0, 20)',
+        [flId, 'Services desk', Number(l.qty)],
+      )
+      continue
+    }
+
+    const { rows: stockRows } = await query(
+      'SELECT warehouse, (in_stock - reserved) AS available FROM stock WHERE product_id = $1 AND (in_stock - reserved) > 0',
+      [l.product_id]
+    )
+
+    const warehouses = [];
+    for (const w of stockRows) {
+      const distance = await getRoutingDistance(w.warehouse, customerCity);
+      warehouses.push({ warehouse: w.warehouse, available: Number(w.available), distance });
+    }
+
+    warehouses.sort((a, b) => {
+      if (a.distance !== b.distance) return a.distance - b.distance;
+      return b.available - a.available;
+    });
+
+    let remainingQty = Number(l.qty);
+    let splits = 0;
+    
+    for (const w of warehouses) {
+      if (remainingQty <= 0) break;
+      const take = Math.min(remainingQty, w.available);
+      
+      const costPerKm = 0.5;
+      const cost = Math.round(w.distance * costPerKm);
+
+      await query(
+        'INSERT INTO fulfillment_suggested (fulfillment_line_id, warehouse, qty_fulfilled, est_shipments, cost, available) VALUES ($1, $2, $3, 1, $4, $5)',
+        [flId, w.warehouse, take, cost, w.available],
+      )
+      splits++;
+      remainingQty -= take;
+      
+      await query(
+        'UPDATE stock SET reserved = reserved + $1 WHERE warehouse = $2 AND product_id = $3',
+        [take, w.warehouse, l.product_id]
+      )
+    }
+
+    if (splits > 1) splitPending = true;
+
+    if (remainingQty > 0) {
+      hasBackorder = true;
+      await query(
+        'INSERT INTO fulfillment_suggested (fulfillment_line_id, warehouse, qty_fulfilled, est_shipments, cost, available) VALUES ($1, $2, $3, 0, 0, 0)',
+        [flId, 'Backorder', remainingQty],
       )
     }
   }
-
+  
+  if (hasBackorder) status = 'backorder';
+  else if (splitPending) status = 'split_pending';
+  
+  if (status !== 'ready') {
+      await query('UPDATE fulfillment_orders SET status = $1 WHERE id = $2', [status, fId]);
+  }
+  
   return getFulfillmentOrder(fId)
 }
 
@@ -320,6 +427,6 @@ export async function consolidateBackorder(id, userName) {
 
   await query("UPDATE fulfillment_orders SET status = 'ready' WHERE id = $1", [id])
   await logActivityDb(`${order.orderNumber} remaining backorder consolidated by ${userName}`)
->>>>>>> origin/main
+
   return getFulfillmentOrder(id)
 }
