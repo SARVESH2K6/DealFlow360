@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { InfoBanner } from '../../components/ui/InfoBanner'
 import { ErrorState, Field, Page, PageHeader, TableSkeleton, inputCls } from '../../components/ui/Page'
 import { useToast } from '../../components/ui/Toast'
 import { money } from '../../lib/format'
-import { usePatchProduct, useProductDetail } from '../../lib/hooks'
+import { usePatchProduct, useProductDetail, useDeleteProduct } from '../../lib/hooks'
 import type { PriceListRule, Product, ProductVariant } from '../../lib/types'
 
 export function ProductDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { push } = useToast()
   const { data, isLoading, isError, error } = useProductDetail(id)
   const patch = usePatchProduct(id ?? '')
+  const del = useDeleteProduct()
   const [form, setForm] = useState<Product | null>(null)
 
   useEffect(() => {
@@ -129,15 +131,34 @@ export function ProductDetailPage() {
       <InfoBanner>
         Recurring lines appear on invoices at the start of the billing period, not when the originating hardware ships.
       </InfoBanner>
-      <Button
-        loading={patch.isPending}
-        onClick={async () => {
-          await patch.mutateAsync(form)
-          push('Product saved.', 'ok')
-        }}
-      >
-        Save product
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          loading={patch.isPending}
+          onClick={async () => {
+            await patch.mutateAsync(form)
+            push('Product saved.', 'ok')
+          }}
+        >
+          Save product
+        </Button>
+        <Button
+          variant="secondary"
+          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+          loading={del.isPending}
+          onClick={async () => {
+            if (!confirm('Are you sure you want to delete this product?')) return
+            try {
+              await del.mutateAsync(form.id)
+              push('Product deleted.', 'ok')
+              navigate('/app/products')
+            } catch (err: any) {
+              push(err.message || 'Failed to delete product', 'warn')
+            }
+          }}
+        >
+          Delete product
+        </Button>
+      </div>
     </Page>
   )
 }

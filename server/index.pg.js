@@ -152,6 +152,20 @@ app.patch('/api/products/:id', auth, requireRoles(['admin']), wrap(async (req, r
   res.json(data)
 }))
 
+app.delete('/api/products/:id', auth, requireRoles(['admin']), wrap(async (req, res) => {
+  try {
+    const success = await prodDb.deleteProduct(req.params.id)
+    if (!success) return res.status(404).json({ error: 'Not found' })
+    res.json({ ok: true })
+  } catch (err) {
+    if (err.message === 'Cannot delete product in use') {
+      res.status(409).json({ error: err.message })
+    } else {
+      throw err
+    }
+  }
+}))
+
 app.get('/api/pricelists', auth, requireRoles(INTERNAL), wrap(async (_req, res) => {
   res.json({ items: await prodDb.listPricelists() })
 }))

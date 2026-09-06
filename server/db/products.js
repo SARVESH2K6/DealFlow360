@@ -140,6 +140,16 @@ export async function patchProduct(id, body) {
   return getProduct(id)
 }
 
+export async function deleteProduct(id) {
+  try {
+    const { rowCount } = await query('DELETE FROM products WHERE id = $1', [id])
+    return rowCount > 0
+  } catch (err) {
+    if (err.code === '23503') throw new Error('Cannot delete product in use')
+    throw err
+  }
+}
+
 export async function listPricelists() {
   const { rows: plRows } = await query('SELECT * FROM pricelists ORDER BY name')
   const { rows: ruleRows } = await query('SELECT * FROM pricelist_rules')
