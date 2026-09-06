@@ -408,6 +408,14 @@ export function usePatchProduct(id: string) {
   })
 }
 
+export function useDeleteProduct() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<{ ok: boolean }>(`/api/products/${id}`, { method: 'DELETE' }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
 export function useDiscountConfig() {
   return useQuery({
     queryKey: ['discount-config'],
